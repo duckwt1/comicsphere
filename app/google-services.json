@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "160076674500",
+    "project_id": "comicsphere-7ac67",
+    "storage_bucket": "comicsphere-7ac67.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:160076674500:android:b074674e13431c599be091",
+        "android_client_info": {
+          "package_name": "com.android.dacs3"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9aead7h2gD8tCbhedTAMJrnM-qwro5IE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
