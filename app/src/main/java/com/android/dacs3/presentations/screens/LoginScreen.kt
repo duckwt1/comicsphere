@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
 
 @Composable
@@ -83,7 +84,7 @@ fun LoginScreen(navController: NavController) {
                     color = Color.Blue,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable {
-                        navController.navigate("signup")
+                        navController.navigate(Screens.SignUpScreen.route)
                     }
                 )
             }
@@ -110,8 +111,8 @@ fun LoginForm(navController: NavController) {
         }
 
         if (viewModel.isLoginSuccessful) {
-            navController.navigate("history") {
-                popUpTo("login") { inclusive = true }
+            navController.navigate(Screens.HistoryScreen.route) { // Ensure this matches the navigation graph
+                popUpTo(Screens.LoginScreen.route) { inclusive = true }
             }
         }
     }

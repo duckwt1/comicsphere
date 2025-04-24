@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
 
 @Composable
@@ -47,8 +48,8 @@ fun SignUpScreen(navController: NavController) {
         }
 
         if (viewModel.isLoginSuccessful) {
-            navController.navigate("home") {
-                popUpTo("signup") { inclusive = true }
+            navController.navigate(Screens.HistoryScreen.route) {
+                popUpTo(Screens.SignUpScreen.route) { inclusive = true }
             }
         }
     }
@@ -173,7 +174,7 @@ fun SignUpScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(10.dp))
                 // Have account? Login
                 TextButton(
-                    onClick = { navController.navigate("login") },
+                    onClick = { navController.navigate(Screens.LoginScreen.route) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
                 ) {

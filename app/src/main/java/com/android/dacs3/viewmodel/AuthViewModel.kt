@@ -6,13 +6,15 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.repository.AuthRepository
+import com.android.dacs3.utliz.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
     var loginState by mutableStateOf("")
@@ -32,6 +34,9 @@ class AuthViewModel @Inject constructor(
             if (result.isSuccess) {
                 loginState = "Login successful"
                 isLoginSuccessful = true
+
+                // Save login state
+                sessionManager.saveLoginState(true)
             } else {
                 loginState = result.exceptionOrNull()?.message ?: "Login failed"
                 isLoginSuccessful = false
