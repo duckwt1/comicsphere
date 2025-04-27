@@ -87,4 +87,17 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.4.0")
 
+    // Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Nếu dùng coroutine:
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+    // accompanist dung de load image
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.33.0-alpha")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.24.0-alpha")
+    implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
+
 }

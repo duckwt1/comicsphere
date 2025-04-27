@@ -1,13 +1,16 @@
 package com.android.dacs3.presentations.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.android.dacs3.presentations.screens.*
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.presentations.screens.ProfileScreen
-import com.android.dacs3.presentations.screens.ExploreScreen
+import com.android.dacs3.viewmodel.MangaViewModel
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -22,6 +25,22 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screens.ExploreScreen.route) { ExploreScreen(navController) }
         composable(Screens.ProfileScreen.route) { ProfileScreen(navController) }
         composable(Screens.SignUpScreen.route) { SignUpScreen(navController) }
+
+        composable(
+            route = Screens.DetailsScreen.route,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val mangaId = backStackEntry.arguments?.getString("id") ?: ""
+            val viewModel: MangaViewModel = hiltViewModel()
+
+            MangaDetailScreen(
+                mangaId = mangaId,
+                navController = navController,
+                viewModel = viewModel,
+                onBackClick = { navController.popBackStack() } // Handle back navigation
+            )
+        }
+
 
     }
 }

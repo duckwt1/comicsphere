@@ -2,8 +2,9 @@
 <project version="4">
   <component name="DiscordProjectSettings">
     <option name="show" value="ASK" />
+    <option name="nameOverrideEnabled" value="true" />
     <option name="description" value="" />
-    <option name="applicationTheme" value="default" />
+    <option name="applicationTheme" value="2024-icons" />
     <option name="iconsTheme" value="default" />
     <option name="button1Title" value="" />
     <option name="button1Url" value="" />

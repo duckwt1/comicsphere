@@ -36,7 +36,7 @@ fun BottomNavigationBar(navController: NavController) {
             .fillMaxWidth()
             .height(70.dp)
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Color(0xFFF5F5F5)) // Màu trắng xám nhạt hơn
+            .background(Color(0xFFF5F5F5))
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically

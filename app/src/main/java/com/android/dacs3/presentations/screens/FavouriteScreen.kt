@@ -15,7 +15,7 @@ import com.example.financial_app.presentation.navigation.BottomNavigationBar
 @Composable
 fun FavouriteScreen(navController: NavController){
     Scaffold(
-        topBar = { SearchBar()},
+//        topBar = { SearchBar()},
         bottomBar = { BottomNavigationBar(navController) }
     ) { innerPadding ->
         Column(

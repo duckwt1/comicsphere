@@ -19,7 +19,7 @@ import com.example.financial_app.presentation.navigation.BottomNavigationBar
 @Composable
 fun HistoryScreen(navController: NavController) {
     Scaffold(
-        topBar = { SearchBar()},
+//        topBar = { SearchBar()},
         bottomBar = { BottomNavigationBar(navController) }
     ) { innerPadding ->
         Column(

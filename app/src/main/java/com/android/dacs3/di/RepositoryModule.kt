@@ -1,6 +1,7 @@
 package com.android.dacs3.di
 
 import android.content.Context
+import com.android.dacs3.data.api.MangaDexApi
 import com.android.dacs3.data.repository.AuthRepository
 import com.android.dacs3.data.repositoryimpl.AuthRepositoryImpl
 import com.android.dacs3.utliz.SessionManager
@@ -11,6 +12,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 @Module
@@ -34,9 +37,28 @@ object FirebaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-
     @Provides
     fun provideSessionManager(@ApplicationContext context: Context): SessionManager {
         return SessionManager(context)
+    }
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.mangadex.org/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMangaDexApi(retrofit: Retrofit): MangaDexApi {
+        return retrofit.create(MangaDexApi::class.java)
     }
 }
