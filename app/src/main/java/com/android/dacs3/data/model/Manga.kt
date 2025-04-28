@@ -19,6 +19,7 @@ data class MangaData(
 data class MangaAttributes(
     val title: Map<String, String>,
     val altTitles: List<Map<String, String>> = emptyList(),
+    val availableTranslatedLanguages: List<String> = emptyList(),
     val description: Map<String, String>,
     val status: String?,
     val tags: List<TagWrapper> = emptyList()

@@ -25,7 +25,6 @@ import com.android.dacs3.viewmodel.MangaViewModel
 import com.example.financial_app.presentation.navigation.BottomNavigationBar
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 @Composable
 fun ExploreScreen(
@@ -36,8 +35,7 @@ fun ExploreScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
 
-    val systemUiController = rememberSystemUiController()
-    systemUiController.setSystemBarsColor(color = Color.Transparent, darkIcons = true)
+
 
     // Trạng thái tìm kiếm
     var searchQuery by remember { mutableStateOf("") }

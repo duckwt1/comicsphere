@@ -24,12 +24,16 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.android.dacs3.utliz.Screens
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
     val currentRoute = currentDestination?.route
+
+    val systemUiController = rememberSystemUiController()
+    systemUiController.setSystemBarsColor(color = Color.Transparent, darkIcons = true)
 
     Row(
         modifier = Modifier

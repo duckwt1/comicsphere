@@ -4,11 +4,10 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.api.MangaDexApi
+import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaDetailUiState
-import com.android.dacs3.data.model.TagWrapper
-import com.android.dacs3.data.model.coverImageUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +29,9 @@ class MangaViewModel @Inject constructor(
 
     private val _mangaDetail = MutableStateFlow(MangaDetailUiState())
     val mangaDetail: StateFlow<MangaDetailUiState> = _mangaDetail
+
+    private val _chapters = MutableStateFlow<List<ChapterData>>(emptyList())
+    val chapters: StateFlow<List<ChapterData>> = _chapters
 
     private var currentPage = 0
     private val pageSize = 15
@@ -91,21 +93,21 @@ class MangaViewModel @Inject constructor(
 
                 val attributes = response.data.attributes
 
-                // Merge languages from title and altTitles
-                val mergedLanguages = (attributes.title.keys + attributes.altTitles.flatMap { it.keys }).distinct()
-                _availableLanguages.value = mergedLanguages
+                val availableLanguages = attributes.availableTranslatedLanguages.distinct()
+                _availableLanguages.value = availableLanguages
 
-                // Select title based on the selected language
                 val selectedTitle = attributes.title[_selectedLanguage.value]
                     ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }?.get(_selectedLanguage.value)
                     ?: attributes.title["en"]
                     ?: attributes.altTitles.firstOrNull { it["en"] != null }?.get("en")
                     ?: "No title available"
 
-                // Select description based on the selected language
-                val selectedDescription = attributes.description[_selectedLanguage.value]
+                val rawDescription = attributes.description[_selectedLanguage.value]
                     ?: attributes.description["en"]
                     ?: "No description available"
+
+                val selectedDescription = rawDescription.split("---")[0].trim()
+
 
                 _mangaDetail.update {
                     MangaDetailUiState(
@@ -129,6 +131,7 @@ class MangaViewModel @Inject constructor(
 
 
 
+
     fun changeLanguage(language: String) {
         _selectedLanguage.value = language
     }
@@ -144,6 +147,41 @@ class MangaViewModel @Inject constructor(
     private fun extractGenres(response: MangaDetailResponse): List<String> {
         return response.data.attributes.tags.mapNotNull { it.attributes.name["en"] }
     }
+
+    fun loadChapters(mangaId: String, language: String) {
+        viewModelScope.launch {
+            try {
+                val response = api.getMangaChapters(
+                    mangaId = mangaId,
+                    translatedLanguage = listOf(language) // Pass the selected language
+                )
+                _chapters.value = response.data
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error loading chapters", e)
+            }
+        }
+    }
+
+
+    private val _chapterImageUrls = MutableStateFlow<List<String>>(emptyList())
+    val chapterImageUrls: StateFlow<List<String>> = _chapterImageUrls
+
+    fun loadChapterContent(chapterId: String) {
+        viewModelScope.launch {
+            try {
+                val response = api.getChapterContent(chapterId)
+                val baseUrl = response.baseUrl
+                val hash = response.chapter.hash
+                val imageUrls = response.chapter.data.map { filename ->
+                    "$baseUrl/data/$hash/$filename"
+                }
+                _chapterImageUrls.value = imageUrls
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error loading chapter content", e)
+            }
+        }
+    }
+
 
 
 }

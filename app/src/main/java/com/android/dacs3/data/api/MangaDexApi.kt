@@ -1,5 +1,7 @@
 package com.android.dacs3.data.api
 
+import com.android.dacs3.data.model.ChapterContentResponse
+import com.android.dacs3.data.model.ChapterListResponse
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
@@ -28,5 +30,16 @@ interface MangaDexApi {
         @Query("includes[]") includes: List<String> = listOf("author", "artist", "cover_art", "tag")
     ): MangaDetailResponse
 
+    @GET("manga/{id}/feed")
+    suspend fun getMangaChapters(
+        @Path("id") mangaId: String,
+        @Query("translatedLanguage[]") translatedLanguage: List<String> = listOf("en"), // chỉ lấy ngôn ngữ mong muốn
+        @Query("order[chapter]") order: String = "asc", // lấy chương theo thứ tự tăng dần (1,2,3...)
+        @Query("limit") limit: Int = 100,
+        @Query("offset") offset: Int = 0
+    ): ChapterListResponse
+
+    @GET("at-home/server/{id}")
+    suspend fun getChapterContent(@Path("id") chapterId: String): ChapterContentResponse
 
 }

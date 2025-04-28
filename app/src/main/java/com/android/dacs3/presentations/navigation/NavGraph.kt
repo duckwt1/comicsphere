@@ -41,6 +41,14 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(
+            route = Screens.ChapterScreen.route,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val chapterId = backStackEntry.arguments?.getString("id") ?: ""
+            ChapterScreen(chapterId = chapterId, viewModel = hiltViewModel())
+        }
+
 
     }
 }
