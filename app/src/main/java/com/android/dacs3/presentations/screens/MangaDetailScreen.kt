@@ -1,5 +1,7 @@
 package com.android.dacs3.presentations.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -102,7 +105,7 @@ fun MangaDetailScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            MangaChapters(chapters = chapters, textColor = textColor,navController = navController)
+            MangaChapters(chapters = chapters, mangaId, textColor = textColor,navController = navController, viewModel = viewModel)
         }
     }
 }
@@ -271,7 +274,15 @@ fun MangaTags(tags: List<String>, textColor: Color) {
 }
 
 @Composable
-fun MangaChapters(chapters: List<ChapterData>, textColor: Color, navController: NavHostController) {
+fun MangaChapters(
+    chapters: List<ChapterData>,
+    mangaId: String,
+    textColor: Color,
+    navController: NavHostController,
+    viewModel: MangaViewModel
+) {
+    val context = LocalContext.current
+
     Text(
         text = "Chapters:",
         fontWeight = FontWeight.Bold,
@@ -290,7 +301,13 @@ fun MangaChapters(chapters: List<ChapterData>, textColor: Color, navController: 
             .forEach { chapter ->
                 TextButton(
                     onClick = {
-                        navController.navigate(Screens.ChapterScreen.createRoute(chapter.id))
+                        val externalUrl = chapter.attributes.externalUrl
+                        if (externalUrl != null) {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(externalUrl))
+                            context.startActivity(intent)
+                        } else {
+                            navController.navigate(Screens.ChapterScreen.createRoute(mangaId ,chapter.id, chapter.attributes.translatedLanguage))
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.textButtonColors(
@@ -308,4 +325,5 @@ fun MangaChapters(chapters: List<ChapterData>, textColor: Color, navController: 
             }
     }
 }
+
 

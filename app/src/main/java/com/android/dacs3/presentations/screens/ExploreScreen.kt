@@ -1,6 +1,5 @@
 package com.android.dacs3.presentations.screens
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -14,10 +13,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.android.dacs3.data.model.MangaData
@@ -35,30 +36,33 @@ fun ExploreScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
 
-
-
-    // Trạng thái tìm kiếm
     var searchQuery by remember { mutableStateOf("") }
-    val filteredMangas = if (searchQuery.isEmpty()) {
-        mangas
-    } else {
-        mangas.filter { manga ->
-            manga.attributes.title["en"]?.contains(searchQuery, ignoreCase = true) == true
-        }
-    }
 
     Scaffold(
         topBar = {
             SearchBar(
                 modifier = Modifier.padding(8.dp),
-                onSearch = { query -> searchQuery = query }
+                onSearch = { query ->
+                    searchQuery = query
+                    if (query.isBlank()) {
+                        viewModel.fetchMangaList(reset = true)
+                    } else {
+                        viewModel.searchManga(query)
+                    }
+                }
             )
         },
         bottomBar = { BottomNavigationBar(navController) }
     ) { innerPadding ->
         SwipeRefresh(
             state = swipeRefreshState,
-            onRefresh = { viewModel.refreshMangaList() },
+            onRefresh = {
+                if (searchQuery.isBlank()) {
+                    viewModel.refreshMangaList()
+                } else {
+                    viewModel.searchManga(searchQuery)
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF8F8F8))
@@ -66,17 +70,27 @@ fun ExploreScreen(
         ) {
             Column(modifier = Modifier.padding(horizontal = 8.dp)) {
                 MangaList(
-                    mangas = filteredMangas,
+                    mangas = mangas,
                     navController = navController,
-                    onLoadMore = { viewModel.fetchMangaList() }
+                    onLoadMore = {
+                        if (searchQuery.isBlank()) {
+                            viewModel.fetchMangaList()
+                        }
+                        // Khi đang search, không load thêm.
+                    }
                 )
             }
         }
     }
 }
 
+
 @Composable
-fun MangaList(mangas: List<MangaData>, navController: NavController, onLoadMore: () -> Unit) {
+fun MangaList(
+    mangas: List<MangaData>,
+    navController: NavController,
+    onLoadMore: () -> Unit
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         contentPadding = PaddingValues(vertical = 8.dp),
@@ -88,10 +102,22 @@ fun MangaList(mangas: List<MangaData>, navController: NavController, onLoadMore:
             MangaItem(manga = manga, navController = navController)
         }
 
-        // Detect scroll to the end of the list
         item {
-            Spacer(modifier = Modifier.height(8.dp))
-            onLoadMore()
+            Spacer(modifier = Modifier)
+        }
+        item {
+            androidx.compose.material3.Button(
+                onClick = { onLoadMore() },
+                modifier = Modifier
+                    .wrapContentSize(Alignment.Center)
+                    .background(Color.Transparent)
+//                    .padding(8.dp)
+            ) {
+                Text(text = "Load More", fontSize = 12.sp, maxLines = 1)
+            }
+        }
+        item {
+            Spacer(modifier = Modifier)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.android.dacs3.presentations.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -43,11 +44,29 @@ fun AppNavGraph(navController: NavHostController) {
 
         composable(
             route = Screens.ChapterScreen.route,
-            arguments = listOf(navArgument("id") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("mangaId") { type = NavType.StringType },
+                navArgument("chapterId") { type = NavType.StringType },
+                navArgument("language") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
-            val chapterId = backStackEntry.arguments?.getString("id") ?: ""
-            ChapterScreen(chapterId = chapterId, viewModel = hiltViewModel())
+            val mangaId = backStackEntry.arguments?.getString("mangaId") ?: ""
+            val chapterId = backStackEntry.arguments?.getString("chapterId") ?: ""
+            val language = backStackEntry.arguments?.getString("language") ?: ""
+
+
+            val viewModel = hiltViewModel<MangaViewModel>()
+
+
+            ChapterScreen(
+                mangaId = mangaId,
+                chapterId = chapterId,
+                language = language,
+                navController = navController,
+                viewModel = viewModel
+            )
         }
+
 
 
     }

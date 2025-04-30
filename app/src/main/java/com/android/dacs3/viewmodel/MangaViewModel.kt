@@ -37,6 +37,17 @@ class MangaViewModel @Inject constructor(
     private val pageSize = 15
     private var isLoading = false
 
+    // --- For ChapterScreen ---
+    private val _chapterImageUrls = MutableStateFlow<List<String>>(emptyList())
+    val chapterImageUrls: StateFlow<List<String>> = _chapterImageUrls
+
+    private val _currentPageReading = MutableStateFlow(1)
+    val currentPageReading: StateFlow<Int> = _currentPageReading
+
+    private val _totalPages = MutableStateFlow(0)
+    val totalPages: StateFlow<Int> = _totalPages
+
+
     init {
         fetchMangaList()
     }
@@ -68,6 +79,17 @@ class MangaViewModel @Inject constructor(
         }
     }
 
+    fun searchManga(title: String) {
+        viewModelScope.launch {
+            try {
+                val result = api.searchManga(title)
+                _mangas.value = result.data
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun refreshMangaList() {
         _isRefreshing.value = true
         fetchMangaList(reset = true)
@@ -83,7 +105,6 @@ class MangaViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val response = api.getMangaById(mangaId)
-                Log.d("MangaViewModel", "API Response: $response")
 
                 if (response.data == null) {
                     Log.w("MangaViewModel", "No manga data found for ID: $mangaId")
@@ -97,7 +118,8 @@ class MangaViewModel @Inject constructor(
                 _availableLanguages.value = availableLanguages
 
                 val selectedTitle = attributes.title[_selectedLanguage.value]
-                    ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }?.get(_selectedLanguage.value)
+                    ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }
+                        ?.get(_selectedLanguage.value)
                     ?: attributes.title["en"]
                     ?: attributes.altTitles.firstOrNull { it["en"] != null }?.get("en")
                     ?: "No title available"
@@ -130,8 +152,6 @@ class MangaViewModel @Inject constructor(
     }
 
 
-
-
     fun changeLanguage(language: String) {
         _selectedLanguage.value = language
     }
@@ -150,23 +170,40 @@ class MangaViewModel @Inject constructor(
 
     fun loadChapters(mangaId: String, language: String) {
         viewModelScope.launch {
-            try {
-                val response = api.getMangaChapters(
-                    mangaId = mangaId,
-                    translatedLanguage = listOf(language) // Pass the selected language
-                )
-                _chapters.value = response.data
-            } catch (e: Exception) {
-                Log.e("MangaViewModel", "Error loading chapters", e)
+            val allChapters = mutableListOf<ChapterData>()
+            var offset = 0
+            val limit = 100
+            var hasMore = true
+
+            while (hasMore) {
+                try {
+                    val response = api.getMangaChapters(
+                        mangaId = mangaId,
+                        translatedLanguage = listOf(language),
+                        order = "asc",
+                        limit = limit,
+                        offset = offset
+                    )
+                    val newChapters = response.data
+                    allChapters.addAll(newChapters)
+
+                    hasMore = newChapters.isNotEmpty()
+                    offset += limit
+                } catch (e: Exception) {
+                    Log.e("MangaViewModel", "Error loading paged chapters", e)
+                    hasMore = false
+                }
             }
+
+            _chapters.value = allChapters
+            Log.d("MangaViewModel", "Loaded ${allChapters.size} chapters")
         }
     }
 
 
-    private val _chapterImageUrls = MutableStateFlow<List<String>>(emptyList())
-    val chapterImageUrls: StateFlow<List<String>> = _chapterImageUrls
-
     fun loadChapterContent(chapterId: String) {
+        Log.d("DEBUG", "Loading content for chapterId=$chapterId")
+
         viewModelScope.launch {
             try {
                 val response = api.getChapterContent(chapterId)
@@ -176,12 +213,49 @@ class MangaViewModel @Inject constructor(
                     "$baseUrl/data/$hash/$filename"
                 }
                 _chapterImageUrls.value = imageUrls
+                _totalPages.value = imageUrls.size
+                _currentPageReading.value = 1
             } catch (e: Exception) {
                 Log.e("MangaViewModel", "Error loading chapter content", e)
             }
         }
     }
 
+    fun updateCurrentPage(page: Int) {
+        _currentPageReading.value = page.coerceIn(1, _totalPages.value)
+    }
+
+    fun loadNextChapter(
+        currentChapterId: String,
+        mangaId: String,
+        language: String,
+        onChapterLoaded: (String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                // Reload chapters only if `_chapters` is empty
+                if (_chapters.value.isEmpty()) {
+                    loadChapters(mangaId, language)
+                }
+
+                // Find the index of the current chapter
+                val currentIndex = _chapters.value.indexOfFirst { it.id == currentChapterId }
+
+                // Check if the next chapter exists
+                if (currentIndex != -1 && currentIndex < _chapters.value.size - 1) {
+                    val nextChapter = _chapters.value[currentIndex + 1]
+                    loadChapterContent(nextChapter.id)
+                    onChapterLoaded(nextChapter.id)
+                } else {
+                    Log.d("MangaViewModel", "No more chapters available")
+                    onChapterLoaded(null)
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error loading next chapter", e)
+                onChapterLoaded(null)
+            }
+        }
+    }
 
 
 }

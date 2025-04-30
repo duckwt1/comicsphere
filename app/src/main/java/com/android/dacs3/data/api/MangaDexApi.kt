@@ -14,7 +14,8 @@ interface MangaDexApi {
     suspend fun searchManga(
         @Query("title") title: String,
         @Query("limit") limit: Int = 10,
-        @Query("offset") offset: Int = 0
+        @Query("offset") offset: Int = 0,
+        @Query("includes[]") includes: List<String> = listOf("cover_art")
     ): MangaListResponse
 
     @GET("manga")
@@ -33,8 +34,8 @@ interface MangaDexApi {
     @GET("manga/{id}/feed")
     suspend fun getMangaChapters(
         @Path("id") mangaId: String,
-        @Query("translatedLanguage[]") translatedLanguage: List<String> = listOf("en"), // chỉ lấy ngôn ngữ mong muốn
-        @Query("order[chapter]") order: String = "asc", // lấy chương theo thứ tự tăng dần (1,2,3...)
+        @Query("translatedLanguage[]") translatedLanguage: List<String> = listOf("en"),
+        @Query("order[chapter]") order: String = "asc",
         @Query("limit") limit: Int = 100,
         @Query("offset") offset: Int = 0
     ): ChapterListResponse

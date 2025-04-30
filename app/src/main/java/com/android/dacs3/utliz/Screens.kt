@@ -12,9 +12,12 @@ sealed class Screens(val route: String) {
     object DetailsScreen : Screens("details_screen/{id}") {
         fun createRoute(id: String): String = "details_screen/$id"
     }
-    object ChapterScreen : Screens("chapter_screen/{id}") {
-        fun createRoute(id: String): String = "chapter_screen/$id"
+
+    object ChapterScreen : Screens("chapter_screen/{mangaId}/{chapterId}/{language}") {
+        fun createRoute(mangaId: String, chapterId: String, language: String): String =
+            "chapter_screen/$mangaId/$chapterId/$language"
     }
+
     object SearchScreen : Screens("search_screen")
     object NotificationsScreen : Screens("notifications_screen")
     object EditProfileScreen : Screens("edit_profile_screen")

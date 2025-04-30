@@ -23,6 +23,7 @@ data class ChapterPageData(
 
 data class ChapterAttributes(
     val chapter: String?,
+    val externalUrl: String?,
     val title: String?,
     val translatedLanguage: String,
     val publishAt: String
