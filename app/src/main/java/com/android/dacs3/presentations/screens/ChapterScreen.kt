@@ -1,6 +1,7 @@
 package com.android.dacs3.presentations.screens
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -23,6 +24,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -39,13 +41,16 @@ fun ChapterScreen(
     language: String,
     navController: NavHostController,
     viewModel: MangaViewModel
-)  {
+) {
+    val context = LocalContext.current
     val chapterImageUrls by viewModel.chapterImageUrls.collectAsState()
     val currentPage by viewModel.currentPageReading.collectAsState()
     val totalPages by viewModel.totalPages.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
+
+    var currentChapterId by remember { mutableStateOf(chapterId) }
 
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -74,8 +79,8 @@ fun ChapterScreen(
         }
     }
 
-    LaunchedEffect(chapterId) {
-        viewModel.loadChapterContent(chapterId)
+    LaunchedEffect(currentChapterId) {
+        viewModel.loadChapterContent(currentChapterId)
     }
 
     LaunchedEffect(firstVisibleItemIndex) {
@@ -91,20 +96,8 @@ fun ChapterScreen(
             val visibleItems = layoutInfo.visibleItemsInfo
             val lastVisibleItem = visibleItems.lastOrNull()
             lastVisibleItem?.index == chapterImageUrls.lastIndex
-        }.collect { shouldLoadNext ->
-            if (shouldLoadNext && chapterImageUrls.isNotEmpty()) {
-                viewModel.loadNextChapter(chapterId, mangaId, language) { nextChapterId ->
-                    if (nextChapterId != null) {
-                        viewModel.loadChapterContent(nextChapterId)
-                        coroutineScope.launch {
-                            listState.scrollToItem(0) // or animateScrollToItem(0)
-                        }
-                        showNextChapterButton = false
-                    } else {
-                        showNextChapterButton = true
-                    }
-                }
-            }
+        }.collect { isAtEnd ->
+            showNextChapterButton = isAtEnd
         }
     }
 
@@ -192,7 +185,9 @@ fun ChapterScreen(
             if (chapterImageUrls.isEmpty()) {
                 Text(
                     text = "Loading...",
-                    modifier = Modifier.padding(16.dp).align(Alignment.Center),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .align(Alignment.Center),
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White
                 )
@@ -242,10 +237,20 @@ fun ChapterScreen(
             ) {
                 Button(
                     onClick = {
-                        viewModel.loadNextChapter(chapterId, mangaId, language) { nextChapterId ->
-                            nextChapterId?.let {
-                                viewModel.loadChapterContent(it)
+                        viewModel.loadNextChapter(currentChapterId, mangaId, language) { nextChapterId ->
+                            if (nextChapterId != null && nextChapterId != currentChapterId) {
+                                coroutineScope.launch {
+                                    listState.scrollToItem(0)
+                                    delay(100)
+                                    currentChapterId = nextChapterId
+                                }
                                 showNextChapterButton = false
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "You have reached the last chapter.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     }

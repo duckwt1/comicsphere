@@ -101,4 +101,6 @@ dependencies {
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.24.0-alpha")
     implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
 
+    implementation ("com.google.android.gms:play-services-base:18.2.0")
+
 }

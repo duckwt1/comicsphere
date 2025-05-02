@@ -1,6 +1,9 @@
 package com.android.dacs3.viewmodel
 
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.api.MangaDexApi
@@ -9,6 +12,7 @@ import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaDetailUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -233,19 +237,24 @@ class MangaViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             try {
-                // Reload chapters only if `_chapters` is empty
                 if (_chapters.value.isEmpty()) {
                     loadChapters(mangaId, language)
+                    while (_chapters.value.isEmpty()) {
+                        delay(100)
+                    }
                 }
 
-                // Find the index of the current chapter
                 val currentIndex = _chapters.value.indexOfFirst { it.id == currentChapterId }
 
-                // Check if the next chapter exists
                 if (currentIndex != -1 && currentIndex < _chapters.value.size - 1) {
                     val nextChapter = _chapters.value[currentIndex + 1]
-                    loadChapterContent(nextChapter.id)
-                    onChapterLoaded(nextChapter.id)
+                    if (nextChapter.id == currentChapterId) {
+                        Log.d("MangaViewModel", "Next chapter is the same as current chapter")
+                        onChapterLoaded(null)
+                    } else {
+                        Log.d("MangaViewModel", "Loading next chapter: ${nextChapter.id} + sdsdf   ${currentChapterId}")
+                        onChapterLoaded(nextChapter.id)
+                    }
                 } else {
                     Log.d("MangaViewModel", "No more chapters available")
                     onChapterLoaded(null)
@@ -256,6 +265,16 @@ class MangaViewModel @Inject constructor(
             }
         }
     }
+
+    var currentChapterId by mutableStateOf<String?>(null)
+        private set
+
+    fun setChapter(chapterId: String) {
+        currentChapterId = chapterId
+        loadChapterContent(chapterId)
+    }
+
+
 
 
 }
