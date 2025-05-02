@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.android.dacs3.presentations.screens.*
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.presentations.screens.ProfileScreen
+import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 
 @Composable
@@ -33,11 +34,13 @@ fun AppNavGraph(navController: NavHostController) {
         ) { backStackEntry ->
             val mangaId = backStackEntry.arguments?.getString("id") ?: ""
             val viewModel: MangaViewModel = hiltViewModel()
+            val favViewModel: FavouriteViewModel = hiltViewModel()
 
             MangaDetailScreen(
                 mangaId = mangaId,
                 navController = navController,
                 viewModel = viewModel,
+                favViewModel = favViewModel,
                 onBackClick = { navController.popBackStack() } // Handle back navigation
             )
         }

@@ -3,7 +3,9 @@ package com.android.dacs3.di
 import android.content.Context
 import com.android.dacs3.data.api.MangaDexApi
 import com.android.dacs3.data.repository.AuthRepository
+import com.android.dacs3.data.repository.FavouriteRepository
 import com.android.dacs3.data.repositoryimpl.AuthRepositoryImpl
+import com.android.dacs3.data.repositoryimpl.FavouriteRepositoryImp
 import com.android.dacs3.utliz.SessionManager
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Binds
@@ -24,7 +26,15 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         authRepositoryImpl: AuthRepositoryImpl
     ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFavouriteRepository(
+        favouriteRepositoryImpl: FavouriteRepositoryImp
+    ): FavouriteRepository
 }
+
+
 
 @Module
 @InstallIn(SingletonComponent::class)

@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.runtime.livedata)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     androidTestImplementation(platform(libs.androidx.compose.bom))

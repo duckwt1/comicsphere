@@ -11,10 +11,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,11 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.MangaDetailUiState
 import com.android.dacs3.utliz.Screens
+import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
@@ -38,86 +43,148 @@ fun MangaDetailScreen(
     mangaId: String,
     navController: NavHostController,
     viewModel: MangaViewModel,
+    favViewModel: FavouriteViewModel,
     onBackClick: () -> Unit
 ) {
     val mangaDetail by viewModel.mangaDetail.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     val availableLanguages by viewModel.availableLanguages.collectAsState()
     val chapters by viewModel.chapters.collectAsState()
+    val loading by favViewModel.loading.observeAsState(false)
+    val error by favViewModel.error.observeAsState()
 
     val textColor = Color(0xFF000000)
     val systemUiController = rememberSystemUiController()
 
     var isDescriptionExpanded by remember { mutableStateOf(false) }
 
+    // Observe the favorite state
+    val isFavourite by favViewModel.isFavourite.observeAsState(false)
+
+    // Load manga details and check favorite status
     LaunchedEffect(mangaId, selectedLanguage) {
         systemUiController.setSystemBarsColor(Color.Transparent, darkIcons = true)
         viewModel.loadMangaDetails(mangaId)
-        viewModel.loadChapters(mangaId,selectedLanguage)
+        viewModel.loadChapters(mangaId, selectedLanguage)
+
+        favViewModel.loadFavourites()
+        favViewModel.checkIfFavourite(mangaId)
+    }
+
+    // Handle error messages
+    LaunchedEffect(error) {
+        error?.let {
+            // Show error message (you can use a Snackbar or Toast here)
+            // After showing the error, clear it
+            favViewModel.clearError()
+        }
     }
 
     Scaffold(
         containerColor = Color(0xFFF8F8F8),
         topBar = {
-            MangaTopBar(onBackClick = onBackClick, textColor = textColor)
+            MangaTopBar(
+                onBackClick = onBackClick,
+                onAddToFavoriteClick = {
+                    if (isFavourite) {
+                        favViewModel.removeFavourite(mangaId)
+                    } else {
+                        favViewModel.addToFavourite(mangaId)
+                    }
+                },
+                textColor = textColor,
+                isFavourite = isFavourite
+            )
         }
     ) { paddingValues ->
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            MangaHeader(
-                mangaDetail = mangaDetail,
-                selectedLanguage = selectedLanguage,
-                availableLanguages = availableLanguages,
-                onLanguageSelected = { viewModel.changeLanguage(it) },
-                textColor = textColor
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    navController.navigate("chapter_screen/$mangaId/$selectedLanguage")
-                },
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text("Read Now")
+                MangaHeader(
+                    mangaDetail = mangaDetail,
+                    selectedLanguage = selectedLanguage,
+                    availableLanguages = availableLanguages,
+                    onLanguageSelected = { viewModel.changeLanguage(it) },
+                    textColor = textColor
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        navController.navigate("chapter_screen/$mangaId/$selectedLanguage")
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Read Now")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                MangaDescription(
+                    description = mangaDetail.description,
+                    isExpanded = isDescriptionExpanded,
+                    onExpandToggle = { isDescriptionExpanded = !isDescriptionExpanded },
+                    textColor = textColor
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                MangaTags(tags = mangaDetail.genres, textColor = textColor)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                MangaChapters(
+                    chapters = chapters,
+                    mangaId = mangaId,
+                    textColor = textColor,
+                    navController = navController,
+                    viewModel = viewModel
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            MangaDescription(
-                description = mangaDetail.description,
-                isExpanded = isDescriptionExpanded,
-                onExpandToggle = { isDescriptionExpanded = !isDescriptionExpanded },
-                textColor = textColor
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            MangaTags(tags = mangaDetail.genres, textColor = textColor)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            MangaChapters(chapters = chapters, mangaId, textColor = textColor,navController = navController, viewModel = viewModel)
+            // Show loading indicator when operation is in progress
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MangaTopBar(onBackClick: () -> Unit, textColor: Color) {
+fun MangaTopBar(
+    onBackClick: () -> Unit,
+    onAddToFavoriteClick: () -> Unit,
+    textColor: Color,
+    isFavourite: Boolean
+) {
     TopAppBar(
         title = { Text("", color = textColor) },
         navigationIcon = {
             IconButton(onClick = onBackClick) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
+            }
+        },
+        actions = {
+            IconButton(onClick = onAddToFavoriteClick) {
+                Icon(
+                    imageVector = if (isFavourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavourite) "Remove from favorites" else "Add to favorites",
+                    tint = if (isFavourite) Color.Red else textColor
+                )
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8F8F8))
