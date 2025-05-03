@@ -1,6 +1,7 @@
 package com.android.dacs3.data.repositoryimpl
 
 import com.android.dacs3.data.api.MangaDexApi
+import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
@@ -48,4 +49,15 @@ class MangaRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun getChapterContent(chapterId: String): Result<ChapterContentResponse> {
+        return try {
+            val response = api.getChapterContent(chapterId)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
 }

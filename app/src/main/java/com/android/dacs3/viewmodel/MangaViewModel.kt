@@ -6,11 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.android.dacs3.data.api.MangaDexApi
-import com.android.dacs3.data.model.ChapterData
-import com.android.dacs3.data.model.MangaData
-import com.android.dacs3.data.model.MangaDetailResponse
-import com.android.dacs3.data.model.MangaDetailUiState
+import com.android.dacs3.data.model.*
+import com.android.dacs3.data.repository.MangaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MangaViewModel @Inject constructor(
-    private val api: MangaDexApi
+    private val repository: MangaRepository
 ) : ViewModel() {
 
     private val _mangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -41,7 +38,7 @@ class MangaViewModel @Inject constructor(
     private val pageSize = 15
     private var isLoading = false
 
-    // --- For ChapterScreen ---
+    // Chapter page navigation
     private val _chapterImageUrls = MutableStateFlow<List<String>>(emptyList())
     val chapterImageUrls: StateFlow<List<String>> = _chapterImageUrls
 
@@ -51,6 +48,14 @@ class MangaViewModel @Inject constructor(
     private val _totalPages = MutableStateFlow(0)
     val totalPages: StateFlow<Int> = _totalPages
 
+    private val _selectedLanguage = MutableStateFlow("en")
+    val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
+
+    private val _availableLanguages = MutableStateFlow<List<String>>(emptyList())
+    val availableLanguages: StateFlow<List<String>> = _availableLanguages
+
+    var currentChapterId by mutableStateOf<String?>(null)
+        private set
 
     init {
         fetchMangaList()
@@ -67,15 +72,14 @@ class MangaViewModel @Inject constructor(
                     _mangas.value = emptyList()
                 }
 
-                val result = api.getMangaList(
-                    limit = pageSize, offset = currentPage * pageSize
-                )
+                val result = repository.fetchMangaList(pageSize, currentPage * pageSize)
+                result.onSuccess {
+                    _mangas.value = _mangas.value + it.data
+                    currentPage++
+                }.onFailure {
+                    Log.e("MangaViewModel", "Error fetching manga list", it)
+                }
 
-                _mangas.value = _mangas.value + result.data
-                currentPage++
-
-            } catch (e: Exception) {
-                e.printStackTrace()
             } finally {
                 isLoading = false
                 if (reset) _isRefreshing.value = false
@@ -85,11 +89,11 @@ class MangaViewModel @Inject constructor(
 
     fun searchManga(title: String) {
         viewModelScope.launch {
-            try {
-                val result = api.searchManga(title)
-                _mangas.value = result.data
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val result = repository.searchManga(title)
+            result.onSuccess {
+                _mangas.value = it.data
+            }.onFailure {
+                Log.e("MangaViewModel", "Error searching manga", it)
             }
         }
     }
@@ -99,31 +103,21 @@ class MangaViewModel @Inject constructor(
         fetchMangaList(reset = true)
     }
 
-    private val _selectedLanguage = MutableStateFlow("en")
-    val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
-    private val _availableLanguages = MutableStateFlow<List<String>>(emptyList())
-    val availableLanguages: StateFlow<List<String>> = _availableLanguages
-
     fun loadMangaDetails(mangaId: String) {
-        Log.d("MangaViewModel", "Loading manga details for ID: $mangaId")
         viewModelScope.launch {
-            try {
-                val response = api.getMangaById(mangaId)
-
+            val result = repository.getMangaById(mangaId)
+            result.onSuccess { response ->
                 if (response.data == null) {
-                    Log.w("MangaViewModel", "No manga data found for ID: $mangaId")
                     _mangaDetail.update { MangaDetailUiState(title = "Manga not found") }
-                    return@launch
+                    return@onSuccess
                 }
 
                 val attributes = response.data.attributes
-
                 val availableLanguages = attributes.availableTranslatedLanguages.distinct()
                 _availableLanguages.value = availableLanguages
 
                 val selectedTitle = attributes.title[_selectedLanguage.value]
-                    ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }
-                        ?.get(_selectedLanguage.value)
+                    ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }?.get(_selectedLanguage.value)
                     ?: attributes.title["en"]
                     ?: attributes.altTitles.firstOrNull { it["en"] != null }?.get("en")
                     ?: "No title available"
@@ -131,9 +125,7 @@ class MangaViewModel @Inject constructor(
                 val rawDescription = attributes.description[_selectedLanguage.value]
                     ?: attributes.description["en"]
                     ?: "No description available"
-
                 val selectedDescription = rawDescription.split("---")[0].trim()
-
 
                 _mangaDetail.update {
                     MangaDetailUiState(
@@ -147,22 +139,19 @@ class MangaViewModel @Inject constructor(
                         descriptions = attributes.description
                     )
                 }
-
-            } catch (e: Exception) {
-                Log.e("MangaViewModel", "Error loading manga details", e)
+            }.onFailure {
+                Log.e("MangaViewModel", "Error loading manga details", it)
                 _mangaDetail.update { MangaDetailUiState(title = "Error loading manga details") }
             }
         }
     }
-
 
     fun changeLanguage(language: String) {
         _selectedLanguage.value = language
     }
 
     private fun buildCoverUrl(response: MangaDetailResponse): String? {
-        val coverFileName =
-            response.data.relationships.firstOrNull { it.type == "cover_art" }?.attributes?.fileName
+        val coverFileName = response.data.relationships.firstOrNull { it.type == "cover_art" }?.attributes?.fileName
         return coverFileName?.let {
             "https://uploads.mangadex.org/covers/${response.data.id}/$it.512.jpg"
         }
@@ -180,47 +169,34 @@ class MangaViewModel @Inject constructor(
             var hasMore = true
 
             while (hasMore) {
-                try {
-                    val response = api.getMangaChapters(
-                        mangaId = mangaId,
-                        translatedLanguage = listOf(language),
-                        order = "asc",
-                        limit = limit,
-                        offset = offset
-                    )
-                    val newChapters = response.data
+                val result = repository.getMangaChapters(mangaId, language, limit, offset)
+                result.onSuccess { newChapters ->
                     allChapters.addAll(newChapters)
-
                     hasMore = newChapters.isNotEmpty()
                     offset += limit
-                } catch (e: Exception) {
-                    Log.e("MangaViewModel", "Error loading paged chapters", e)
+                }.onFailure {
+                    Log.e("MangaViewModel", "Error loading chapters", it)
                     hasMore = false
                 }
             }
 
             _chapters.value = allChapters
-            Log.d("MangaViewModel", "Loaded ${allChapters.size} chapters")
         }
     }
 
-
     fun loadChapterContent(chapterId: String) {
-        Log.d("DEBUG", "Loading content for chapterId=$chapterId")
-
         viewModelScope.launch {
-            try {
-                val response = api.getChapterContent(chapterId)
+            val result = repository.getChapterContent(chapterId)
+            result.onSuccess { response ->
                 val baseUrl = response.baseUrl
                 val hash = response.chapter.hash
-                val imageUrls = response.chapter.data.map { filename ->
-                    "$baseUrl/data/$hash/$filename"
-                }
+                val imageUrls = response.chapter.data.map { "$baseUrl/data/$hash/$it" }
+
                 _chapterImageUrls.value = imageUrls
                 _totalPages.value = imageUrls.size
                 _currentPageReading.value = 1
-            } catch (e: Exception) {
-                Log.e("MangaViewModel", "Error loading chapter content", e)
+            }.onFailure {
+                Log.e("MangaViewModel", "Error loading chapter content", it)
             }
         }
     }
@@ -245,18 +221,10 @@ class MangaViewModel @Inject constructor(
                 }
 
                 val currentIndex = _chapters.value.indexOfFirst { it.id == currentChapterId }
-
                 if (currentIndex != -1 && currentIndex < _chapters.value.size - 1) {
                     val nextChapter = _chapters.value[currentIndex + 1]
-                    if (nextChapter.id == currentChapterId) {
-                        Log.d("MangaViewModel", "Next chapter is the same as current chapter")
-                        onChapterLoaded(null)
-                    } else {
-                        Log.d("MangaViewModel", "Loading next chapter: ${nextChapter.id} + sdsdf   ${currentChapterId}")
-                        onChapterLoaded(nextChapter.id)
-                    }
+                    onChapterLoaded(nextChapter.id)
                 } else {
-                    Log.d("MangaViewModel", "No more chapters available")
                     onChapterLoaded(null)
                 }
             } catch (e: Exception) {
@@ -266,17 +234,8 @@ class MangaViewModel @Inject constructor(
         }
     }
 
-    var currentChapterId by mutableStateOf<String?>(null)
-        private set
-
     fun setChapter(chapterId: String) {
         currentChapterId = chapterId
         loadChapterContent(chapterId)
     }
-
-
-
-
 }
-
-

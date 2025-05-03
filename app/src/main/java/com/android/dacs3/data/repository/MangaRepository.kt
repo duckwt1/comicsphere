@@ -1,5 +1,6 @@
 package com.android.dacs3.data.repository
 
+import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
@@ -10,4 +11,6 @@ interface MangaRepository {
     suspend fun searchManga(title: String): Result<MangaListResponse>
     suspend fun getMangaById(id: String): Result<MangaDetailResponse>
     suspend fun getMangaChapters(mangaId: String, language: String, limit: Int, offset: Int): Result<List<ChapterData>>
+    suspend fun getChapterContent(chapterId: String): Result<ChapterContentResponse>
+
 }
