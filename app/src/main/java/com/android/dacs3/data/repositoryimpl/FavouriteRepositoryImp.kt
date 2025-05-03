@@ -1,5 +1,6 @@
 package com.android.dacs3.data.repositoryimpl
 
+import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.repository.FavouriteRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -10,6 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class FavouriteRepositoryImp @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
+    private val api: com.android.dacs3.data.api.MangaDexApi
 ) : FavouriteRepository {
     override suspend fun getFavourites(userId: String): Result<List<String>> {
         return try {
@@ -22,6 +24,15 @@ class FavouriteRepositoryImp @Inject constructor(
             val favourites = snapshot.documents.mapNotNull { it.getString("mangaId") }
 
             Result.success(favourites)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getMangaById(id: String): Result<MangaData> {
+        return try {
+            val response = api.getMangaById(id)
+            Result.success(response.data) // Lấy MangaData từ response
         } catch (e: Exception) {
             Result.failure(e)
         }

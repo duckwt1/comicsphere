@@ -76,7 +76,6 @@ fun ExploreScreen(
                         if (searchQuery.isBlank()) {
                             viewModel.fetchMangaList()
                         }
-                        // Khi đang search, không load thêm.
                     }
                 )
             }

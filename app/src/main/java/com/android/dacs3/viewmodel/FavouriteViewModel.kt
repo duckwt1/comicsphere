@@ -5,9 +5,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.repository.FavouriteRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -49,6 +52,26 @@ class FavouriteViewModel @Inject constructor(
             _favourites.value = emptyList()
         }
     }
+
+    private val _mangaDetails = MutableLiveData<List<MangaData>>()
+    val mangaDetails: LiveData<List<MangaData>> = _mangaDetails
+
+
+    fun loadFavouriteDetails() {
+        loadFavourites()
+        val ids = _favourites.value ?: return
+        viewModelScope.launch {
+            _loading.value = true
+            val mangaList = ids.map { id ->
+                async {
+                    repository.getMangaById(id).getOrNull()
+                }
+            }.awaitAll().filterNotNull() // Filter out null results
+            _mangaDetails.value = mangaList
+            _loading.value = false
+        }
+    }
+
 
     fun addToFavourite(mangaId: String) {
         val userId = firebaseAuth.currentUser?.uid
