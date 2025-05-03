@@ -1,4 +1,4 @@
-package com.example.financial_app.presentation.navigation
+package com.android.dacs3.presentations.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

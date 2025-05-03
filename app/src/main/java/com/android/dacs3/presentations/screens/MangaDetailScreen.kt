@@ -37,6 +37,7 @@ import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun MangaDetailScreen(
@@ -61,6 +62,9 @@ fun MangaDetailScreen(
     // Observe the favorite state
     val isFavourite by favViewModel.isFavourite.observeAsState(false)
 
+    // Observe last read chapter
+    val lastReadChapter by viewModel.lastReadChapter.collectAsState()
+
     // Load manga details and check favorite status
     LaunchedEffect(mangaId, selectedLanguage) {
         systemUiController.setSystemBarsColor(Color.Transparent, darkIcons = true)
@@ -69,6 +73,9 @@ fun MangaDetailScreen(
 
         favViewModel.loadFavourites()
         favViewModel.checkIfFavourite(mangaId)
+
+        // Get the last read chapter
+        viewModel.getLastReadChapter(mangaId, selectedLanguage)
     }
 
     // Handle error messages
@@ -97,6 +104,7 @@ fun MangaDetailScreen(
             )
         }
     ) { paddingValues ->
+
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -117,14 +125,32 @@ fun MangaDetailScreen(
 
                 Button(
                     onClick = {
-                        navController.navigate("chapter_screen/$mangaId/$selectedLanguage")
+                        if (lastReadChapter != null) {
+                            val (chapterId, pageIndex) = lastReadChapter!!
+                            navController.navigate(Screens.ChapterScreen.createRoute(mangaId, chapterId, selectedLanguage, pageIndex))
+                        } else {
+                            // If no last read chapter, navigate to the first chapter
+                            val firstChapter = chapters.firstOrNull()
+                            if (firstChapter != null) {
+                                navController.navigate(Screens.ChapterScreen.createRoute(mangaId, firstChapter.id, selectedLanguage))
+                            }
+                        }
                     },
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Text("Read Now")
+                    Text(
+                        if (lastReadChapter != null) {
+                            val (chapterId, pageIndex) = lastReadChapter!!
+                            val chapter = chapters.find { it.id == chapterId }
+                            val chapterNumber = chapter?.attributes?.chapter ?: "?"
+                            "Continue Chapter $chapterNumber - Page $pageIndex"
+                        } else {
+                            "Start Reading"
+                        }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -163,6 +189,7 @@ fun MangaDetailScreen(
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MangaTopBar(

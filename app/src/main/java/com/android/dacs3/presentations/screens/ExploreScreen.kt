@@ -22,8 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.android.dacs3.data.model.MangaData
+import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.viewmodel.MangaViewModel
-import com.example.financial_app.presentation.navigation.BottomNavigationBar
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 

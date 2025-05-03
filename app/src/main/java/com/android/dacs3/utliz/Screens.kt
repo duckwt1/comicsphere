@@ -13,9 +13,9 @@ sealed class Screens(val route: String) {
         fun createRoute(id: String): String = "details_screen/$id"
     }
 
-    object ChapterScreen : Screens("chapter_screen/{mangaId}/{chapterId}/{language}") {
-        fun createRoute(mangaId: String, chapterId: String, language: String): String =
-            "chapter_screen/$mangaId/$chapterId/$language"
+    object ChapterScreen : Screens("chapter_screen/{mangaId}/{chapterId}/{language}/{pageIndex}") {
+        fun createRoute(mangaId: String, chapterId: String, language: String, pageIndex: Int = 0): String =
+            "chapter_screen/$mangaId/$chapterId/$language/$pageIndex"
     }
 
     object SearchScreen : Screens("search_screen")

@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.model.*
 import com.android.dacs3.data.repository.MangaRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,11 +16,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
 class MangaViewModel @Inject constructor(
-    private val repository: MangaRepository
+    private val repository: MangaRepository,
+    private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
     private val _mangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -56,6 +61,12 @@ class MangaViewModel @Inject constructor(
 
     var currentChapterId by mutableStateOf<String?>(null)
         private set
+
+    private val _lastReadChapter = MutableStateFlow<Pair<String, Int>?>(null)
+    val lastReadChapter: StateFlow<Pair<String, Int>?> = _lastReadChapter.asStateFlow()
+
+    private val _mangaDetails = MutableStateFlow<Map<String, MangaData>>(emptyMap())
+    val mangaDetails: StateFlow<Map<String, MangaData>> = _mangaDetails
 
     init {
         fetchMangaList()
@@ -234,8 +245,94 @@ class MangaViewModel @Inject constructor(
         }
     }
 
-    fun setChapter(chapterId: String) {
-        currentChapterId = chapterId
-        loadChapterContent(chapterId)
+    fun saveReadingProgress(
+        mangaId: String,
+        chapterId: String,
+        language: String,
+        lastPageIndex: Int
+    ) {
+        val userId = firebaseAuth.currentUser?.uid
+        if (userId != null) {
+            viewModelScope.launch {
+                val result = repository.saveReadingProgress(userId, mangaId, chapterId, language, lastPageIndex)
+                result.onSuccess {
+                    Log.d("MangaViewModel", "Reading progress saved successfully")
+                }.onFailure {
+                    Log.e("MangaViewModel", "Error saving reading progress", it)
+                }
+            }
+        } else {
+            Log.e("MangaViewModel", "User not authenticated")
+        }
     }
+
+    fun getLastReadChapter(mangaId: String, language: String) {
+        val userId = firebaseAuth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            val result = repository.getLastReadChapter(userId, mangaId, language)
+            result.onSuccess { (chapterId, lastPageIndex) ->
+                _lastReadChapter.value = Pair(chapterId, lastPageIndex)
+                Log.d("MangaViewModel", "Last read chapter: $chapterId, page: $lastPageIndex")
+            }
+            result.onFailure {
+                Log.e("MangaViewModel", "Failed to get last read chapter", it)
+            }
+        }
+    }
+
+    private val _readingProgress = MutableStateFlow<List<ReadingProgress>>(emptyList())
+    val readingProgress: StateFlow<List<ReadingProgress>> = _readingProgress
+
+    fun loadReadingProgress() {
+        val userId = firebaseAuth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val result = repository.getReadingProgress(userId)
+                result.onSuccess { progress ->
+                    _readingProgress.value = progress
+                    
+                    // Load manga details for each progress item
+                    progress.forEach { progressItem ->
+                        if (!_mangaDetails.value.containsKey(progressItem.mangaId)) {
+                            repository.getMangaById(progressItem.mangaId).onSuccess { response ->
+                                response.data?.let { mangaData ->
+                                    _mangaDetails.update { currentMap ->
+                                        currentMap + (mangaData.id to mangaData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }.onFailure {
+                    Log.e("MangaViewModel", "Error loading reading progress", it)
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Unexpected error while loading reading progress", e)
+            }
+        }
+    }
+
+    fun formatHistoryDate(timestamp: Long): String {
+        if (timestamp <= 0) return "Unknown Date"
+
+        val inputDate = Date(timestamp)
+        val now = Date()
+
+        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val input = sdf.format(inputDate)
+        val today = sdf.format(now)
+
+        // Yesterday logic
+        val calendar = java.util.Calendar.getInstance().apply { time = now }
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        val yesterday = sdf.format(calendar.time)
+
+        return when (input) {
+            today -> "Today"
+            yesterday -> "Yesterday"
+            else -> input
+        }
+    }
+
+
 }

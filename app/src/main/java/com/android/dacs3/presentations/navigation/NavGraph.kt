@@ -22,7 +22,12 @@ fun AppNavGraph(navController: NavHostController) {
     ) {
         composable(Screens.SplashScreen.route) { SplashScreen(navController) }
         composable(Screens.LoginScreen.route) { LoginScreen(navController) }
-        composable(Screens.HistoryScreen.route) { HistoryScreen(navController) }
+
+        composable(Screens.HistoryScreen.route) {
+            val viewModel: MangaViewModel = hiltViewModel()
+            HistoryScreen(navController = navController, viewModel = viewModel)
+        }
+
         composable(Screens.FavouriteScreen.route) { FavouriteScreen(navController) }
         composable(Screens.ExploreScreen.route) { ExploreScreen(navController) }
         composable(Screens.ProfileScreen.route) { ProfileScreen(navController) }
@@ -50,21 +55,22 @@ fun AppNavGraph(navController: NavHostController) {
             arguments = listOf(
                 navArgument("mangaId") { type = NavType.StringType },
                 navArgument("chapterId") { type = NavType.StringType },
-                navArgument("language") { type = NavType.StringType }
+                navArgument("language") { type = NavType.StringType },
+                navArgument("pageIndex") { type = NavType.IntType }
             )
         ) { backStackEntry ->
             val mangaId = backStackEntry.arguments?.getString("mangaId") ?: ""
             val chapterId = backStackEntry.arguments?.getString("chapterId") ?: ""
             val language = backStackEntry.arguments?.getString("language") ?: ""
-
+            val pageIndex = backStackEntry.arguments?.getInt("pageIndex") ?: 0
 
             val viewModel = hiltViewModel<MangaViewModel>()
-
 
             ChapterScreen(
                 mangaId = mangaId,
                 chapterId = chapterId,
                 language = language,
+                pageIndex = pageIndex,
                 navController = navController,
                 viewModel = viewModel
             )

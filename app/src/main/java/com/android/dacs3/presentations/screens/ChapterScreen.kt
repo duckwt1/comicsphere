@@ -39,6 +39,7 @@ fun ChapterScreen(
     mangaId: String,
     chapterId: String,
     language: String,
+    pageIndex: Int = 0,
     navController: NavHostController,
     viewModel: MangaViewModel
 ) {
@@ -46,7 +47,7 @@ fun ChapterScreen(
     val chapterImageUrls by viewModel.chapterImageUrls.collectAsState()
     val currentPage by viewModel.currentPageReading.collectAsState()
     val totalPages by viewModel.totalPages.collectAsState()
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = pageIndex)
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
 
@@ -72,6 +73,7 @@ fun ChapterScreen(
     var showControls by remember { mutableStateOf(false) }
     var showNextChapterButton by remember { mutableStateOf(false) }
 
+    // user interaction to show/hide controls
     LaunchedEffect(showControls) {
         if (showControls) {
             delay(3000)
@@ -83,6 +85,7 @@ fun ChapterScreen(
         viewModel.loadChapterContent(currentChapterId)
     }
 
+    // Load the chapter content when the screen is first displayed
     LaunchedEffect(firstVisibleItemIndex) {
         if (chapterImageUrls.isNotEmpty()) {
             val visiblePage = firstVisibleItemIndex + 1
@@ -90,6 +93,7 @@ fun ChapterScreen(
         }
     }
 
+    // Use to show the next chapter button when the user reaches the end of the list
     LaunchedEffect(listState) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
@@ -101,12 +105,14 @@ fun ChapterScreen(
         }
     }
 
+    // Reset the offset when zooming out
     LaunchedEffect(animatedScale, offset) {
         if (animatedScale <= 1.05f && firstVisibleItemIndex >= 0 && pagePositions.isNotEmpty()) {
             offset = Offset.Zero
         }
     }
 
+    // Use to reset the scale and offset when zooming
     var lastVisibleIndex by remember { mutableStateOf(0) }
     LaunchedEffect(firstVisibleItemIndex) {
         if (lastVisibleIndex != firstVisibleItemIndex && isZooming) {
@@ -114,6 +120,29 @@ fun ChapterScreen(
             offset = Offset.Zero
         }
         lastVisibleIndex = firstVisibleItemIndex
+    }
+
+    // Save the reading progress when the user scrolls
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }.collect { index ->
+            if (index >= 0 && chapterImageUrls.isNotEmpty()) {
+                val lastPageIndex = index + 1
+                viewModel.saveReadingProgress(
+                    mangaId = mangaId,
+                    chapterId = currentChapterId,
+                    language = language,
+                    lastPageIndex = lastPageIndex
+                )
+            }
+        }
+    }
+
+    // Scroll to the specified page when the screen is first displayed
+    LaunchedEffect(chapterImageUrls) {
+        if (chapterImageUrls.isNotEmpty() && pageIndex > 0) {
+            listState.scrollToItem(pageIndex)
+            viewModel.updateCurrentPage(pageIndex + 1)
+        }
     }
 
     Box(

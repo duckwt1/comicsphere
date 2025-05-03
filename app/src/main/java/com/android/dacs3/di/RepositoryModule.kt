@@ -10,6 +10,7 @@ import com.android.dacs3.data.repositoryimpl.FavouriteRepositoryImp
 import com.android.dacs3.data.repositoryimpl.MangaRepositoryImpl
 import com.android.dacs3.utliz.SessionManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -51,6 +52,12 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideFirestore(): FirebaseFirestore {
+        return FirebaseFirestore.getInstance()
+    }
 }
 
 @Module
