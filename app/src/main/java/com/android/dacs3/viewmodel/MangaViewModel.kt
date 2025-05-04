@@ -358,6 +358,26 @@ class MangaViewModel @Inject constructor(
         }
     }
 
+    fun deleteReadingProgress(mangaId: String, chapterId: String, language: String) {
+        viewModelScope.launch {
+            try {
+                val userId = firebaseAuth.currentUser?.uid ?: return@launch
+                
+                Log.d("MangaViewModel", "Deleting reading progress for manga=$mangaId, chapter=$chapterId")
+                
+                repository.deleteReadingProgress(userId, mangaId, chapterId, language).onSuccess {
+                    Log.d("MangaViewModel", "Successfully deleted reading progress")
+                    // Reload reading progress after deletion
+                    loadReadingProgress(true)
+                }.onFailure { e ->
+                    Log.e("MangaViewModel", "Error deleting reading progress", e)
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Unexpected error in deleteReadingProgress", e)
+            }
+        }
+    }
+
     private suspend fun loadChapterWithPagination(mangaId: String, language: String, targetChapterId: String) {
         var offset = 0
         val limit = 100

@@ -135,6 +135,7 @@ class MangaRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
     override suspend fun getReadingProgress(userId: String): Result<List<ReadingProgress>> {
         return try {
             Log.d("MangaRepositoryImpl", "Getting reading progress for user: $userId")
@@ -182,5 +183,27 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteReadingProgress(
+        userId: String,
+        mangaId: String,
+        chapterId: String,
+        language: String
+    ): Result<Boolean> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Deleting reading progress for user=$userId, manga=$mangaId, chapter=$chapterId, language=$language")
 
+            firestore.collection("users")
+                .document(userId)
+                .collection("readingProgress")
+                .document("${mangaId}_${language}_$chapterId")
+                .delete()
+                .await()
+
+            Log.d("MangaRepositoryImpl", "Successfully deleted reading progress")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error deleting reading progress", e)
+            Result.failure(e)
+        }
+    }
 }

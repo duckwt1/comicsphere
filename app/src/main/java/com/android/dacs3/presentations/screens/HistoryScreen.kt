@@ -219,7 +219,11 @@ fun HistoryScreen(
                                             navController.navigate(Screens.DetailsScreen.createRoute(manga.id))
                                         },
                                         onDelete = {
-                                            // TODO: Implement delete functionality
+                                            viewModel.deleteReadingProgress(
+                                                mangaId = progress.mangaId,
+                                                chapterId = progress.chapterId,
+                                                language = progress.language
+                                            )
                                         }
                                     )
                                 }

@@ -25,4 +25,11 @@ interface MangaRepository {
     suspend fun getLastReadChapter(userId: String, mangaId: String, language: String): Result<Pair<String, Int>>
 
     suspend fun getReadingProgress(userId: String): Result<List<ReadingProgress>>
+    
+    suspend fun deleteReadingProgress(
+        userId: String,
+        mangaId: String,
+        chapterId: String,
+        language: String
+    ): Result<Boolean>
 }
