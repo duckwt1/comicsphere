@@ -114,29 +114,31 @@ class MangaRepositoryImpl @Inject constructor(
                 .get()
                 .await()
 
-            if (!querySnapshot.isEmpty) {
-                val latestDoc = querySnapshot.documents.maxByOrNull { 
-                    it.getLong("timestamp") ?: 0L 
-                }
-                
-                if (latestDoc != null) {
-                    val chapterId = latestDoc.getString("chapterId") ?: return Result.failure(Exception("No chapterId"))
-                    val lastPageIndex = latestDoc.getLong("lastPageIndex")?.toInt() ?: 0
-                    Result.success(chapterId to lastPageIndex)
-                } else {
-                    Result.failure(Exception("No valid reading progress found"))
-                }
+            if (querySnapshot.isEmpty) {
+                Log.e("MangaRepositoryImpl", "No reading progress found for mangaId=$mangaId, language=$language")
+                return Result.failure(Exception("No reading progress found"))
+            }
+
+            val latestDoc = querySnapshot.documents.maxByOrNull {
+                it.getLong("timestamp") ?: 0L
+            }
+
+            if (latestDoc != null) {
+                val chapterId = latestDoc.getString("chapterId") ?: return Result.failure(Exception("No chapterId"))
+                val lastPageIndex = latestDoc.getLong("lastPageIndex")?.toInt() ?: 0
+                Result.success(chapterId to lastPageIndex)
             } else {
-                Result.failure(Exception("No reading progress found"))
+                Result.failure(Exception("No valid reading progress found"))
             }
         } catch (e: Exception) {
             Log.e("MangaRepositoryImpl", "Error getting last read chapter", e)
             Result.failure(e)
         }
     }
-
     override suspend fun getReadingProgress(userId: String): Result<List<ReadingProgress>> {
         return try {
+            Log.d("MangaRepositoryImpl", "Getting reading progress for user: $userId")
+
             val querySnapshot = firestore.collection("users")
                 .document(userId)
                 .collection("readingProgress")
@@ -144,21 +146,35 @@ class MangaRepositoryImpl @Inject constructor(
                 .get()
                 .await()
 
+            Log.d("MangaRepositoryImpl", "Found ${querySnapshot.documents.size} reading progress documents")
+
             val progressList = querySnapshot.documents.mapNotNull { doc ->
                 try {
+                    val mangaId = doc.getString("mangaId")
+                    val chapterId = doc.getString("chapterId")
+                    val language = doc.getString("language")
+                    val lastPageIndex = doc.getLong("lastPageIndex")
+                    val timestamp = doc.getLong("timestamp")
+
+                    if (mangaId == null || chapterId == null || language == null || lastPageIndex == null || timestamp == null) {
+                        Log.e("MangaRepositoryImpl", "Missing required fields in document: ${doc.id}")
+                        return@mapNotNull null
+                    }
+
                     ReadingProgress(
-                        mangaId = doc.getString("mangaId") ?: return@mapNotNull null,
-                        chapterId = doc.getString("chapterId") ?: return@mapNotNull null,
-                        language = doc.getString("language") ?: return@mapNotNull null,
-                        lastPageIndex = doc.getLong("lastPageIndex")?.toInt() ?: 0,
-                        timestamp = doc.getLong("timestamp") ?: 0L
+                        mangaId = mangaId,
+                        chapterId = chapterId,
+                        language = language,
+                        lastPageIndex = lastPageIndex.toInt(),
+                        timestamp = timestamp
                     )
                 } catch (e: Exception) {
-                    Log.e("MangaRepositoryImpl", "Error parsing reading progress document", e)
+                    Log.e("MangaRepositoryImpl", "Error parsing reading progress document ${doc.id}", e)
                     null
                 }
             }
 
+            Log.d("MangaRepositoryImpl", "Successfully parsed ${progressList.size} reading progress items")
             Result.success(progressList)
         } catch (e: Exception) {
             Log.e("MangaRepositoryImpl", "Error getting reading progress", e)

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -67,6 +68,11 @@ class MangaViewModel @Inject constructor(
 
     private val _mangaDetails = MutableStateFlow<Map<String, MangaData>>(emptyMap())
     val mangaDetails: StateFlow<Map<String, MangaData>> = _mangaDetails
+
+
+    // Load chapter details
+    private val _chapterDetails = MutableStateFlow<Map<String, ChapterData>>(emptyMap())
+    val chapterDetails: StateFlow<Map<String, ChapterData>> = _chapterDetails
 
     init {
         fetchMangaList()
@@ -283,56 +289,139 @@ class MangaViewModel @Inject constructor(
     private val _readingProgress = MutableStateFlow<List<ReadingProgress>>(emptyList())
     val readingProgress: StateFlow<List<ReadingProgress>> = _readingProgress
 
-    fun loadReadingProgress() {
-        val userId = firebaseAuth.currentUser?.uid ?: return
+    fun loadReadingProgress(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             try {
-                val result = repository.getReadingProgress(userId)
-                result.onSuccess { progress ->
+                // Nếu không cần refresh và đã có dữ liệu, không gọi API
+                if (!forceRefresh && _readingProgress.value.isNotEmpty()) {
+                    Log.d("MangaViewModel", "Using cached reading progress")
+                    return@launch
+                }
+
+                val userId = firebaseAuth.currentUser?.uid ?: return@launch
+
+                Log.d("MangaViewModel", "Starting to load reading progress")
+                repository.getReadingProgress(userId).onSuccess { progress ->
+                    Log.d("MangaViewModel", "Successfully loaded ${progress.size} reading progress items")
                     _readingProgress.value = progress
-                    
-                    // Load manga details for each progress item
-                    progress.forEach { progressItem ->
+
+                    // Lấy lần đọc gần nhất của mỗi manga
+                    val latestProgressByManga = progress
+                        .groupBy { it.mangaId }
+                        .mapValues { entry -> entry.value.maxByOrNull { it.timestamp }!! }
+                        .values
+                        .sortedByDescending { it.timestamp }
+
+                    Log.d("MangaViewModel", "Found ${latestProgressByManga.size} latest progress items")
+
+                    // Load manga details cho mỗi progress
+                    latestProgressByManga.forEach { progressItem ->
                         if (!_mangaDetails.value.containsKey(progressItem.mangaId)) {
-                            repository.getMangaById(progressItem.mangaId).onSuccess { response ->
-                                response.data?.let { mangaData ->
-                                    _mangaDetails.update { currentMap ->
-                                        currentMap + (mangaData.id to mangaData)
+                            try {
+                                Log.d("MangaViewModel", "Loading manga details for ${progressItem.mangaId}")
+                                repository.getMangaById(progressItem.mangaId).onSuccess { response ->
+                                    response.data?.let { mangaData ->
+                                        _mangaDetails.update { currentMap ->
+                                            currentMap + (mangaData.id to mangaData)
+                                        }
+                                        Log.d("MangaViewModel", "Successfully loaded manga details for ${mangaData.id}")
                                     }
+                                }.onFailure { e ->
+                                    Log.e("MangaViewModel", "Error loading manga details for ${progressItem.mangaId}", e)
                                 }
+                            } catch (e: Exception) {
+                                Log.e("MangaViewModel", "Unexpected error loading manga details", e)
                             }
                         }
                     }
-                }.onFailure {
-                    Log.e("MangaViewModel", "Error loading reading progress", it)
+
+                    delay(500) // Đợi một chút để manga details được load xong
+
+                    // Load chapter details cho mỗi progress
+                    latestProgressByManga.forEach { progressItem ->
+                        if (!_chapterDetails.value.containsKey(progressItem.chapterId)) {
+                            try {
+                                Log.d("MangaViewModel", "Loading chapters for ${progressItem.mangaId}")
+                                // Thử load chapter cụ thể trước
+                                loadChapterWithPagination(progressItem.mangaId, progressItem.language, progressItem.chapterId)
+                            } catch (e: Exception) {
+                                Log.e("MangaViewModel", "Unexpected error loading chapters", e)
+                            }
+                        }
+                    }
+                }.onFailure { e ->
+                    Log.e("MangaViewModel", "Error loading reading progress", e)
                 }
             } catch (e: Exception) {
-                Log.e("MangaViewModel", "Unexpected error while loading reading progress", e)
+                Log.e("MangaViewModel", "Unexpected error in loadReadingProgress", e)
             }
+        }
+    }
+
+    private suspend fun loadChapterWithPagination(mangaId: String, language: String, targetChapterId: String) {
+        var offset = 0
+        val limit = 100
+        var found = false
+        var hasMore = true
+
+        while (hasMore && !found) {
+            repository.getMangaChapters(mangaId, language, limit, offset).onSuccess { chapters ->
+                if (chapters.isEmpty()) {
+                    hasMore = false
+                    return@onSuccess
+                }
+
+                val chapterMap = chapters.associateBy { it.id }
+                _chapterDetails.update { currentMap ->
+                    currentMap + chapterMap
+                }
+
+                if (chapterMap.containsKey(targetChapterId)) {
+                    found = true
+                    Log.d("MangaViewModel", "Found target chapter $targetChapterId at offset $offset")
+                } else {
+                    offset += limit
+                    Log.d("MangaViewModel", "Chapter $targetChapterId not found in current batch, trying next batch")
+                }
+            }.onFailure { e ->
+                Log.e("MangaViewModel", "Error loading chapters for $mangaId at offset $offset", e)
+                hasMore = false
+            }
+        }
+
+        if (!found) {
+            Log.e("MangaViewModel", "Chapter $targetChapterId not found in any batch for manga $mangaId")
         }
     }
 
     fun formatHistoryDate(timestamp: Long): String {
         if (timestamp <= 0) return "Unknown Date"
 
-        val inputDate = Date(timestamp)
-        val now = Date()
+        val now = Calendar.getInstance()
+        val input = Calendar.getInstance().apply { timeInMillis = timestamp }
 
-        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        val input = sdf.format(inputDate)
-        val today = sdf.format(now)
+        val sdf = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
 
-        // Yesterday logic
-        val calendar = java.util.Calendar.getInstance().apply { time = now }
-        calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
-        val yesterday = sdf.format(calendar.time)
+        val inputDate = sdf.format(input.time)
+        val todayDate = sdf.format(now.time)
 
-        return when (input) {
-            today -> "Today"
-            yesterday -> "Yesterday"
-            else -> input
+        now.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterdayDate = sdf.format(now.time)
+
+        // Reset lại now sau khi trừ ngày hôm qua
+        now.add(Calendar.DAY_OF_YEAR, 1)
+
+        val diffInMillis = now.timeInMillis - input.timeInMillis
+        val daysDiff = (diffInMillis / (1000 * 60 * 60 * 24)).toInt()
+
+        return when {
+            inputDate == todayDate -> "Today"
+            inputDate == yesterdayDate -> "Yesterday"
+            daysDiff in 2..6 -> "$daysDiff days ago"
+            else -> inputDate
         }
     }
+
 
 
 }
