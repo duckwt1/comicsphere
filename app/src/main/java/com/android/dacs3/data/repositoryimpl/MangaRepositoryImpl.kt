@@ -14,6 +14,7 @@ import javax.inject.Singleton
 import android.util.Log
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.ReadingProgress
+import com.android.dacs3.data.model.TagWrapper
 
 @Singleton
 class MangaRepositoryImpl @Inject constructor(
@@ -34,6 +35,15 @@ class MangaRepositoryImpl @Inject constructor(
         return try {
             val response = api.searchManga(title)
             Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getTags(): Result<List<TagWrapper>> {
+        return try {
+            val response = api.getTags()
+            Result.success(response.data)
         } catch (e: Exception) {
             Result.failure(e)
         }

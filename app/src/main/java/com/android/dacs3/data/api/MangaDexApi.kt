@@ -4,6 +4,8 @@ import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterListResponse
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
+import com.android.dacs3.data.model.TagListResponse
+import com.android.dacs3.data.model.TagWrapper
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -20,7 +22,7 @@ interface MangaDexApi {
 
     @GET("manga")
     suspend fun getMangaList(
-        @Query("limit") limit: Int = 10,
+        @Query("limit") limit: Int = 100,
         @Query("offset") offset: Int = 0,
         @Query("includes[]") includes: List<String> = listOf("cover_art")
     ): MangaListResponse
@@ -53,10 +55,13 @@ interface MangaDexApi {
 
     @GET("manga")
     suspend fun getRecommendedManga(
-        @Query("limit") limit: Int = 10,
+        @Query("limit") limit: Int = 100,
         @Query("offset") offset: Int = 0,
         @Query("includes[]") includes: List<String> = listOf("cover_art"),
         @Query("includedTags[]") includedTags: List<String> = listOf(),
         @Query("includedTagsMode") includedTagsMode: String = "AND"
     ): MangaListResponse
+
+    @GET("manga/tag")
+    suspend fun getTags(): TagListResponse
 }

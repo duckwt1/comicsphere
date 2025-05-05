@@ -9,5 +9,10 @@ data class TagWrapper(
 data class TagAttributes(
     val name: Map<String, String>,
     val description: Map<String, String>,
-    val group: String // <-- chính cái này dùng để lọc genre
+    val group: String
+)
+
+data class TagListResponse(
+    val result: String,
+    val data: List<TagWrapper>
 )

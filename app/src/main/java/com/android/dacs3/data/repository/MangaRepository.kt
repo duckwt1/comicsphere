@@ -5,6 +5,7 @@ import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
 import com.android.dacs3.data.model.ReadingProgress
+import com.android.dacs3.data.model.TagWrapper
 
 interface MangaRepository {
     suspend fun fetchMangaList(limit: Int, offset: Int): Result<MangaListResponse>
@@ -48,4 +49,6 @@ interface MangaRepository {
         limit: Int,
         offset: Int
     ): Result<MangaListResponse>
+
+    suspend fun getTags(): Result<List<TagWrapper>>
 }

@@ -68,9 +68,6 @@ class MangaViewModel @Inject constructor(
     private val _availableLanguages = MutableStateFlow<List<String>>(emptyList())
     val availableLanguages: StateFlow<List<String>> = _availableLanguages
 
-    var currentChapterId by mutableStateOf<String?>(null)
-        private set
-
     private val _lastReadChapter = MutableStateFlow<Pair<String, Int>?>(null)
     val lastReadChapter: StateFlow<Pair<String, Int>?> = _lastReadChapter.asStateFlow()
 
@@ -613,6 +610,54 @@ class MangaViewModel @Inject constructor(
             daysDiff in 2..6 -> "$daysDiff days ago"
             else -> inputDate
         }
+    }
+
+    private val _tags = MutableStateFlow<List<TagWrapper>>(emptyList())
+    val tags: StateFlow<List<TagWrapper>> = _tags
+
+    private val _selectedTags = MutableStateFlow<List<String>>(emptyList())
+    val selectedTags: StateFlow<List<String>> = _selectedTags
+
+    var selectedTabIndex by mutableStateOf(0)
+        private set
+
+    fun fetchTags() {
+        viewModelScope.launch {
+            repository.getTags().onSuccess { tagList ->
+                _tags.value = tagList
+                Log.d("MangaViewModel", "Fetched ${tagList.size} tags")
+            }.onFailure {
+                Log.e("MangaViewModel", "Error fetching tags", it)
+            }
+        }
+    }
+
+// Sửa lại phương thức applyTagFilter
+
+    fun updateSelectedTags(tagId: String, selected: Boolean) {
+        _selectedTags.update { currentTags ->
+            if (selected) {
+                currentTags + tagId
+            } else {
+                currentTags - tagId
+            }
+        }
+    }
+
+    fun applyTagFilter() {
+        if (_selectedTags.value.isEmpty()) {
+            when (selectedTabIndex) {
+                0 -> fetchMangaList(reset = true)
+                1 -> fetchRecommendedManga(reset = true)
+                2 -> fetchTrendingManga(reset = true)
+            }
+        } else {
+            fetchRecommendedManga(includedTagIds = _selectedTags.value, reset = true)
+        }
+    }
+
+    fun clearAllTags(){
+        _selectedTags.value = emptyList()
     }
 
 
