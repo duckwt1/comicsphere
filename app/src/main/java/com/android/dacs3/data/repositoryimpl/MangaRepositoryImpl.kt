@@ -206,4 +206,39 @@ class MangaRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun fetchTrendingManga(limit: Int, offset: Int): Result<MangaListResponse> {
+        return try {
+            val response = api.getTrendingManga(
+                limit = limit,
+                offset = offset,
+                order = "desc"
+            )
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    override suspend fun fetchRecommendedManga(
+        includedTagIds: List<String>,
+        limit: Int,
+        offset: Int
+    ): Result<MangaListResponse> {
+        return try {
+            val response = api.getRecommendedManga(
+                limit = limit,
+                offset = offset,
+                includedTags = includedTagIds,
+                includedTagsMode = "OR"
+            )
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+
 }

@@ -40,9 +40,17 @@ class MangaViewModel @Inject constructor(
     private val _chapters = MutableStateFlow<List<ChapterData>>(emptyList())
     val chapters: StateFlow<List<ChapterData>> = _chapters
 
+    // Pagination for All Manga
     private var currentPage = 0
     private val pageSize = 15
     private var isLoading = false
+
+    // Pagination for Trending Manga
+    private var trendingPage = 0
+
+    // Pagination for Recommended Manga
+    private var recommendedPage = 0
+    private var currentRecommendedTags: List<String> = emptyList()
 
     // Chapter page navigation
     private val _chapterImageUrls = MutableStateFlow<List<String>>(emptyList())
@@ -101,6 +109,171 @@ class MangaViewModel @Inject constructor(
                 isLoading = false
                 if (reset) _isRefreshing.value = false
             }
+        }
+    }
+
+    fun fetchTrendingManga(limit: Int = 21, offset: Int = -1, reset: Boolean = false) {
+        if (isLoading) return
+        isLoading = true
+
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            try {
+                // Reset pagination if requested
+                if (reset) {
+                    trendingPage = 0
+                    _mangas.value = emptyList()
+                }
+
+                // Calculate actual offset
+                val actualOffset = if (offset >= 0) offset else trendingPage * limit
+
+                val result = repository.fetchTrendingManga(limit, actualOffset)
+                result.onSuccess { response ->
+                    // Append data instead of replacing
+                    _mangas.value = if (trendingPage == 0) {
+                        response.data
+                    } else {
+                        _mangas.value + response.data
+                    }
+
+                    // Increment page for next load
+                    trendingPage++
+
+                    Log.d("MangaViewModel", "Loaded trending manga page $trendingPage, total items: ${_mangas.value.size}")
+                }.onFailure { exception ->
+                    Log.e("MangaViewModel", "Error fetching trending manga", exception)
+                }
+            } finally {
+                isLoading = false
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun fetchRecommendedManga(includedTagIds: List<String>? = null, limit: Int = 21, offset: Int = -1, reset: Boolean = false) {
+        if (isLoading) return
+        isLoading = true
+
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            try {
+                // Reset pagination if requested or if new tags are provided
+                val shouldReset = reset || (includedTagIds != null && includedTagIds != currentRecommendedTags)
+
+                if (shouldReset) {
+                    recommendedPage = 0
+                    _mangas.value = emptyList()
+                }
+
+                // If no tags provided, try to get tags from reading history
+                val tagsToUse = includedTagIds ?: currentRecommendedTags.takeIf { it.isNotEmpty() } ?: getRecommendedTagsFromHistory()
+
+                // Save current tags for future pagination
+                if (tagsToUse != currentRecommendedTags) {
+                    currentRecommendedTags = tagsToUse
+                }
+
+                if (tagsToUse.isEmpty()) {
+                    Log.d("MangaViewModel", "No tags available for recommendations, falling back to trending")
+                    isLoading = false
+                    _isRefreshing.value = false
+                    fetchTrendingManga(limit, offset, reset)
+                    return@launch
+                }
+
+                // Calculate actual offset
+                val actualOffset = if (offset >= 0) offset else recommendedPage * limit
+
+                Log.d("MangaViewModel", "Fetching recommendations with tags: $tagsToUse, page: $recommendedPage, offset: $actualOffset")
+                val result = repository.fetchRecommendedManga(tagsToUse, limit, actualOffset)
+                result.onSuccess { response ->
+                    // Append data instead of replacing
+                    _mangas.value = if (recommendedPage == 0) {
+                        response.data
+                    } else {
+                        _mangas.value + response.data
+                    }
+
+                    // Increment page for next load
+                    recommendedPage++
+
+                    Log.d("MangaViewModel", "Loaded recommended manga page $recommendedPage, total items: ${_mangas.value.size}")
+                }.onFailure { exception ->
+                    Log.e("MangaViewModel", "Error fetching recommended manga", exception)
+                }
+            } finally {
+                isLoading = false
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+
+    private suspend fun getRecommendedTagsFromHistory(): List<String> {
+        try {
+            // Make sure reading progress is loaded
+            if (_readingProgress.value.isEmpty()) {
+                loadReadingProgress()
+                // Wait a bit for data to load
+                delay(500)
+            }
+
+            // If still no reading progress, return empty list
+            if (_readingProgress.value.isEmpty()) {
+                Log.d("MangaViewModel", "No reading progress available for tag extraction")
+                return emptyList()
+            }
+
+            // Get unique manga IDs from reading history
+            val mangaIds = _readingProgress.value
+                .groupBy { it.mangaId }
+                .keys
+                .toList()
+
+            Log.d("MangaViewModel", "Found ${mangaIds.size} unique manga in reading history")
+
+            // Load manga details if needed
+            val tagFrequency = mutableMapOf<String, Int>()
+            val processedManga = mutableSetOf<String>()
+
+            for (mangaId in mangaIds) {
+                // Skip if already processed
+                if (mangaId in processedManga) continue
+
+                // Get manga details from cache or load them
+                val mangaData = _mangaDetails.value[mangaId] ?: run {
+                    val result = repository.getMangaById(mangaId)
+                    result.getOrNull()?.data
+                }
+
+                if (mangaData == null) {
+                    Log.e("MangaViewModel", "Failed to get manga details for $mangaId")
+                    continue
+                }
+
+                processedManga.add(mangaId)
+
+                // Extract tags from manga
+                mangaData.attributes.tags.forEach { tag ->
+                    // Increment tag frequency
+                    val tagId = tag.id
+                    tagFrequency[tagId] = (tagFrequency[tagId] ?: 0) + 1
+                }
+            }
+
+            // Get the most frequent tags (up to 5)
+            val topTags = tagFrequency.entries
+                .sortedByDescending { it.value }
+                .take(5)
+                .map { it.key }
+
+            Log.d("MangaViewModel", "Extracted top tags: $topTags")
+            return topTags
+
+        } catch (e: Exception) {
+            Log.e("MangaViewModel", "Error extracting tags from history", e)
+            return emptyList()
         }
     }
 
@@ -362,9 +535,9 @@ class MangaViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val userId = firebaseAuth.currentUser?.uid ?: return@launch
-                
+
                 Log.d("MangaViewModel", "Deleting reading progress for manga=$mangaId, chapter=$chapterId")
-                
+
                 repository.deleteReadingProgress(userId, mangaId, chapterId, language).onSuccess {
                     Log.d("MangaViewModel", "Successfully deleted reading progress")
                     // Reload reading progress after deletion

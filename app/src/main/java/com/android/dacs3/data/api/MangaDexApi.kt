@@ -2,7 +2,6 @@ package com.android.dacs3.data.api
 
 import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterListResponse
-import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
 import retrofit2.http.GET
@@ -10,6 +9,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MangaDexApi {
+
     @GET("manga")
     suspend fun searchManga(
         @Query("title") title: String,
@@ -43,4 +43,20 @@ interface MangaDexApi {
     @GET("at-home/server/{id}")
     suspend fun getChapterContent(@Path("id") chapterId: String): ChapterContentResponse
 
+    @GET("manga")
+    suspend fun getTrendingManga(
+        @Query("limit") limit: Int = 100,
+        @Query("offset") offset: Int = 0,
+        @Query("includes[]") includes: List<String> = listOf("cover_art"),
+        @Query("order[followedCount]") order: String = "desc"
+    ): MangaListResponse
+
+    @GET("manga")
+    suspend fun getRecommendedManga(
+        @Query("limit") limit: Int = 10,
+        @Query("offset") offset: Int = 0,
+        @Query("includes[]") includes: List<String> = listOf("cover_art"),
+        @Query("includedTags[]") includedTags: List<String> = listOf(),
+        @Query("includedTagsMode") includedTagsMode: String = "AND"
+    ): MangaListResponse
 }
