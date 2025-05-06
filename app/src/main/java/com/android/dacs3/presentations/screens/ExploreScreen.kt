@@ -3,6 +3,7 @@ package com.android.dacs3.presentations.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import com.google.accompanist.flowlayout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,12 +15,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.android.dacs3.R
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.TagWrapper
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
@@ -99,14 +102,17 @@ fun ExploreScreen(
                             )
                         }
                     }
-                    
+
                     IconButton(onClick = { showTagFilter = !showTagFilter }) {
+                        val iconResId = if (showTagFilter) R.drawable.ic_filter_2 else R.drawable.ic_filter_1
                         Icon(
-                            imageVector = Icons.Default.List,
-                            contentDescription = "Filter",
-                            tint = Color.Gray
+                            painter = painterResource(id = iconResId),
+                            contentDescription = if (showTagFilter) "Close Filter" else "Open Filter",
+                            modifier = Modifier.size(24.dp),
+                            tint = Color.Black
                         )
                     }
+
                 }
                 
                 // Tag filter section
@@ -230,7 +236,7 @@ fun TagFilterSection(
                 text = "Filter by Tags",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.Black
                 ),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -262,30 +268,35 @@ fun TagFilterSection(
                                 text = formattedGroupName,
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
+                                    color = Color.Black
                                 ),
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                             
                             FlowRow(
-//                                mainAxisSpacing = 8.dp,
-//                                crossAxisSpacing = 8.dp,
+                                mainAxisSpacing = 6.dp,
+//                                crossAxisSpacing = 2.dp,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTags.contains(tag.id)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { onTagSelected(tag.id, !isSelected) },
-                                        label = {
-                                            Text(
-                                                text = tag.attributes.name["en"] ?: "Unknown",
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontSize = 12.sp
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { onTagSelected(tag.id, !isSelected) },
+                                            label = {
+                                                Text(
+                                                    text = tag.attributes.name["en"] ?: "Unknown",
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontSize = 12.sp
+                                                )
+                                            }, colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color.LightGray, // Background color when selected
+                                                selectedLabelColor = Color.Black,           // Color when selected
+                                                containerColor = Color.White,          // Background color when not selected
+                                                labelColor = Color.DarkGray                 // Color when not selected
                                             )
-                                        }
-                                    )
+                                        )
                                 }
                             }
                             
@@ -318,7 +329,8 @@ fun TagFilterSection(
                 
                 Button(
                     onClick = onApplyFilter,
-                    shape = MaterialTheme.shapes.medium
+                    shape = MaterialTheme.shapes.medium,
+
                 ) {
                     Text("Apply Filter")
                 }
