@@ -42,11 +42,11 @@ fun ExploreScreen(
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
     val tags by viewModel.tags.collectAsState()
     val selectedTags by viewModel.selectedTags.collectAsState()
-    
+
     var searchQuery by remember { mutableStateOf("") }
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabTitles = listOf("All Manga", "For You", "Trending")
-    
+
     var showTagFilter by remember { mutableStateOf(false) }
 
     // Initialize data when screen is first displayed
@@ -114,7 +114,7 @@ fun ExploreScreen(
                     }
 
                 }
-                
+
                 // Tag filter section
                 AnimatedVisibility(visible = showTagFilter) {
                     TagFilterSection(
@@ -189,21 +189,28 @@ fun MangaList(
             MangaItem(manga = manga, navController = navController)
         }
 
-        item {
-            Spacer(modifier = Modifier)
-        }
-        item {
-            Button(
-                onClick = { onLoadMore() },
-                modifier = Modifier
-                    .wrapContentSize(Alignment.Center)
-                    .background(Color.Transparent)
-            ) {
-                Text(text = "Load More", fontSize = 12.sp, maxLines = 1)
+        // Show Load More button if:
+        // 1. There are items
+        // 2. We have at least 3 items (to maintain grid layout)
+        // 3. If it's search results, only show if we have 21 or more items
+        if (mangas.isNotEmpty() && mangas.size >= 3 && 
+            ( mangas.size >= 21)) {
+            item {
+                Spacer(modifier = Modifier)
             }
-        }
-        item {
-            Spacer(modifier = Modifier)
+            item {
+                Button(
+                    onClick = { onLoadMore() },
+                    modifier = Modifier
+                        .wrapContentSize(Alignment.Center)
+                        .background(Color.Transparent)
+                ) {
+                    Text(text = "Load More", fontSize = 12.sp, maxLines = 1)
+                }
+            }
+            item {
+                Spacer(modifier = Modifier)
+            }
         }
     }
 }
@@ -219,7 +226,7 @@ fun TagFilterSection(
 ) {
     // Group tags
     val groupedTags = tags.groupBy { it.attributes.group }
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -260,10 +267,10 @@ fun TagFilterSection(
                     groupedTags.forEach { (group, tagsInGroup) ->
                         item {
                             // Touppercase the first letter
-                            val formattedGroupName = group.replaceFirstChar { 
+                            val formattedGroupName = group.replaceFirstChar {
                                 if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                             }
-                            
+
                             Text(
                                 text = formattedGroupName,
                                 style = MaterialTheme.typography.titleSmall.copy(
@@ -272,7 +279,7 @@ fun TagFilterSection(
                                 ),
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
-                            
+
                             FlowRow(
                                 mainAxisSpacing = 6.dp,
 //                                crossAxisSpacing = 2.dp,
@@ -280,26 +287,26 @@ fun TagFilterSection(
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTags.contains(tag.id)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { onTagSelected(tag.id, !isSelected) },
-                                            label = {
-                                                Text(
-                                                    text = tag.attributes.name["en"] ?: "Unknown",
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    fontSize = 12.sp
-                                                )
-                                            }, colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color.LightGray, // Background color when selected
-                                                selectedLabelColor = Color.Black,           // Color when selected
-                                                containerColor = Color.White,          // Background color when not selected
-                                                labelColor = Color.DarkGray                 // Color when not selected
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { onTagSelected(tag.id, !isSelected) },
+                                        label = {
+                                            Text(
+                                                text = tag.attributes.name["en"] ?: "Unknown",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                fontSize = 12.sp
                                             )
+                                        }, colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color.LightGray, // Background color when selected
+                                            selectedLabelColor = Color.Black,           // Color when selected
+                                            containerColor = Color.White,          // Background color when not selected
+                                            labelColor = Color.DarkGray                 // Color when not selected
                                         )
+                                    )
                                 }
                             }
-                            
+
                             Divider(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 color = Color.LightGray,
@@ -326,12 +333,12 @@ fun TagFilterSection(
                 ) {
                     Text("Clear All")
                 }
-                
+
                 Button(
                     onClick = onApplyFilter,
                     shape = MaterialTheme.shapes.medium,
 
-                ) {
+                    ) {
                     Text("Apply Filter")
                 }
             }

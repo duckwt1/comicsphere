@@ -587,28 +587,32 @@ class MangaViewModel @Inject constructor(
     fun formatHistoryDate(timestamp: Long): String {
         if (timestamp <= 0) return "Unknown Date"
 
-        val now = Calendar.getInstance()
+        // Generate current date
+        val today = Calendar.getInstance()
         val input = Calendar.getInstance().apply { timeInMillis = timestamp }
 
+        // Reset hour, minute, second, millisecond cho cả hai
+        today.set(Calendar.HOUR_OF_DAY, 0)
+        today.set(Calendar.MINUTE, 0)
+        today.set(Calendar.SECOND, 0)
+        today.set(Calendar.MILLISECOND, 0)
+
+        input.set(Calendar.HOUR_OF_DAY, 0)
+        input.set(Calendar.MINUTE, 0)
+        input.set(Calendar.SECOND, 0)
+        input.set(Calendar.MILLISECOND, 0)
+
+        // Calculate difference in days
+        val diffInDays = ((today.timeInMillis - input.timeInMillis) / (1000 * 60 * 60 * 24)).toInt()
+
+        // Format date
         val sdf = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
 
-        val inputDate = sdf.format(input.time)
-        val todayDate = sdf.format(now.time)
-
-        now.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayDate = sdf.format(now.time)
-
-        // Reset lại now sau khi trừ ngày hôm qua
-        now.add(Calendar.DAY_OF_YEAR, 1)
-
-        val diffInMillis = now.timeInMillis - input.timeInMillis
-        val daysDiff = (diffInMillis / (1000 * 60 * 60 * 24)).toInt()
-
-        return when {
-            inputDate == todayDate -> "Today"
-            inputDate == yesterdayDate -> "Yesterday"
-            daysDiff in 2..6 -> "$daysDiff days ago"
-            else -> inputDate
+        return when (diffInDays) {
+            0 -> "Today"
+            1 -> "Yesterday"
+            in 2..6 -> "$diffInDays days ago"
+            else -> sdf.format(Date(timestamp))
         }
     }
 
