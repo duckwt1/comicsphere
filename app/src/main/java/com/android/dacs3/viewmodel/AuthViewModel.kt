@@ -37,6 +37,9 @@ class AuthViewModel @Inject constructor(
     var isLoading by mutableStateOf(false)
         private set
 
+    var isUpdatingAvatar by mutableStateOf(false)
+        private set
+
     init {
         loadCurrentUser()
     }
@@ -72,11 +75,11 @@ class AuthViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            isLoading = true
+            isUpdatingAvatar = true
             try {
                 // Upload image to Cloudinary
                 val imageUrl = cloudinaryService.uploadImage(imageUri)
-                
+
                 // Update user document in Firestore
                 FirebaseFirestore.getInstance()
                     .collection("users")
@@ -84,13 +87,19 @@ class AuthViewModel @Inject constructor(
                     .update("avatar", imageUrl)
                     .await()
 
-                // Update local user state
-                currentUser = currentUser?.copy(avatar = imageUrl)
-                loginState = "Avatar updated successfully"
+                // Reload user data to get the latest information
+                authRepository.getUserInfo(firebaseUser.uid)
+                    .onSuccess { user ->
+                        currentUser = user
+                        loginState = ""
+                    }
+                    .onFailure { e ->
+                        loginState = e.message ?: "Failed to reload user data"
+                    }
             } catch (e: Exception) {
                 loginState = e.message ?: "Failed to update avatar"
             } finally {
-                isLoading = false
+                isUpdatingAvatar = false
             }
         }
     }

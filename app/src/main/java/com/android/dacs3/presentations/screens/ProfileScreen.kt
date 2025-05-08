@@ -3,18 +3,30 @@ package com.android.dacs3.presentations.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -22,12 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.utliz.Screens
-import com.android.dacs3.utliz.SessionManager
 import com.android.dacs3.viewmodel.AuthViewModel
 
 @Composable
@@ -44,131 +53,27 @@ fun ProfileScreen(navController: NavController, viewModel: AuthViewModel) {
             BottomNavigationBar(navController = navController)
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF8F8F8))
+                .background(
+                    Color(0xFFF8F8F8)
+                )
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
             when {
                 viewModel.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    LoadingView()
                 }
                 viewModel.loginState.isNotEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(viewModel.loginState, color = Color.Red)
-                    }
+                    ErrorView(errorMessage = viewModel.loginState)
                 }
                 else -> {
-                    // Avatar với nút edit được tách ra để hiển thị đúng
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 16.dp)
-                            .size(100.dp)
-                    ) {
-                        // Avatar
-                        Box(
-                            modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE0E0E0)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (viewModel.currentUser?.avatar.isNullOrBlank()) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "Default Avatar",
-                                    modifier = Modifier.size(60.dp),
-                                    tint = Color.DarkGray
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = viewModel.currentUser?.avatar,
-                                    contentDescription = "User Avatar",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                        }
-
-                        // Edit button được đặt ở góc dưới bên phải và đè lên ảnh
-                        FloatingActionButton(
-                            onClick = { imagePicker.launch("image/*") },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .align(Alignment.BottomEnd)
-                                .offset(x = 8.dp, y = 8.dp),
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
-                            elevation = FloatingActionButtonDefaults.elevation(
-                                defaultElevation = 4.dp
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit Avatar",
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Card with profile information
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            ProfileItem(label = "Full name", value = viewModel.currentUser?.fullname ?: "N/A")
-                            Divider(color = Color.LightGray, thickness = 0.5.dp)
-                            ProfileItem(label = "Nickname", value = viewModel.currentUser?.nickname ?: "N/A")
-                            Divider(color = Color.LightGray, thickness = 0.5.dp)
-                            ProfileItem(label = "Email", value = viewModel.currentUser?.email ?: "N/A")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Logout Button
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 32.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.logout()
-                                navController.navigate(Screens.LoginScreen.route) {
-                                    popUpTo(Screens.SplashScreen.route) { inclusive = true }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .padding(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                    ProfileContent(
+                        viewModel = viewModel,
+                        imagePicker = imagePicker,
+                        navController = navController
+                    )
                 }
             }
         }
@@ -176,18 +81,311 @@ fun ProfileScreen(navController: NavController, viewModel: AuthViewModel) {
 }
 
 @Composable
-fun ProfileItem(label: String, value: String) {
+private fun LoadingView() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(50.dp)
+        )
+    }
+}
+
+@Composable
+private fun ErrorView(errorMessage: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = errorMessage,
+            color = Color.Red,
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun ProfileContent(
+    viewModel: AuthViewModel,
+    imagePicker: androidx.activity.result.ActivityResultLauncher<String>,
+    navController: NavController
+) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, fontSize = 14.sp, color = Color.Gray)
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // User avatar section
+        ProfileAvatar(
+            avatarUrl = viewModel.currentUser?.avatar,
+            isUpdating = viewModel.isUpdatingAvatar,
+            onEditClick = { imagePicker.launch("image/*") }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // User name with welcome text
         Text(
-            value.ifBlank { "N/A" },
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
+            text = "Welcome back,",
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.Gray
+        )
+
+        Text(
+            text = viewModel.currentUser?.fullname ?: "User",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
             color = Color.Black
         )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Profile information card
+        ProfileInfoCard(viewModel = viewModel)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Logout button
+        LogoutButton(
+            onClick = {
+                viewModel.logout()
+                navController.navigate(Screens.LoginScreen.route) {
+                    popUpTo(Screens.SplashScreen.route) { inclusive = true }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ProfileAvatar(
+    avatarUrl: String?,
+    isUpdating: Boolean,
+    onEditClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(120.dp)
+            .padding(4.dp)
+    ) {
+        // Avatar container with border
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .shadow(4.dp, CircleShape)
+                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                .clip(CircleShape)
+                .background(Color(0xFFE0E0E0)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarUrl.isNullOrBlank()) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "Default Avatar",
+                    modifier = Modifier.size(64.dp),
+                    tint = Color.Black
+                )
+            } else {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "User Avatar",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            // Loading overlay
+            AnimatedVisibility(
+                visible = isUpdating,
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+        }
+
+        // Edit button
+        if (!isUpdating) {
+            FloatingActionButton(
+                onClick = onEditClick,
+                modifier = Modifier
+                    .size(30.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 4.dp, y = 4.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit Avatar",
+                    modifier = Modifier.size(15.dp),
+                    tint = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoCard(viewModel: AuthViewModel) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = Color(0x40000000)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "Personal Information",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = Color.Black
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ProfileInfoItem(
+                icon = Icons.Rounded.Person,
+                label = "Full Name",
+                value = viewModel.currentUser?.fullname ?: "N/A"
+            )
+
+            Divider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = Color.LightGray.copy(alpha = 0.5f),
+                thickness = 1.dp
+            )
+
+            ProfileInfoItem(
+                icon = Icons.Rounded.Face,
+                label = "Nickname",
+                value = viewModel.currentUser?.nickname ?: "N/A"
+            )
+
+            Divider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = Color.LightGray.copy(alpha = 0.5f),
+                thickness = 1.dp
+            )
+
+            ProfileInfoItem(
+                icon = Icons.Rounded.Email,
+                label = "Email",
+                value = viewModel.currentUser?.email ?: "N/A"
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileInfoItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Icon background
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.Black,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column {
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                color = Color.Gray
+            )
+
+            Text(
+                text = value.ifBlank { "N/A" },
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.DarkGray
+            )
+        }
+    }
+}
+
+@Composable
+private fun LogoutButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Red,
+            contentColor = Color.White
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.ExitToApp,
+                contentDescription = "Logout Icon",
+                tint = Color.White
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "Logout",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        }
     }
 }
