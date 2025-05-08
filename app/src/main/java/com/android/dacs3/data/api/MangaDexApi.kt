@@ -64,4 +64,16 @@ interface MangaDexApi {
 
     @GET("manga/tag")
     suspend fun getTags(): TagListResponse
+
+    @GET("manga")
+    suspend fun getMangaByTags(
+        @Query("includedTags[]") includedTags: List<String>,
+        @Query("includedTagsMode") includedTagsMode: String = "AND",
+        @Query("limit") limit: Int = 100,
+        @Query("offset") offset: Int = 0,
+        @Query("includes[]") includes: List<String> = listOf("cover_art")
+    ): MangaListResponse
 }
+
+
+

@@ -96,7 +96,11 @@ class MangaViewModel @Inject constructor(
 
                 val result = repository.fetchMangaList(pageSize, currentPage * pageSize)
                 result.onSuccess {
-                    _mangas.value = _mangas.value + it.data
+                    if (reset) {
+                        _mangas.value = it.data
+                    } else {
+                        _mangas.value = _mangas.value + it.data
+                    }
                     currentPage++
                 }.onFailure {
                     Log.e("MangaViewModel", "Error fetching manga list", it)
@@ -622,6 +626,9 @@ class MangaViewModel @Inject constructor(
     private val _selectedTags = MutableStateFlow<List<String>>(emptyList())
     val selectedTags: StateFlow<List<String>> = _selectedTags
 
+    private val _tagFilterMode = MutableStateFlow("AND")
+    val tagFilterMode: StateFlow<String> = _tagFilterMode
+
     var selectedTabIndex by mutableStateOf(0)
         private set
 
@@ -636,8 +643,6 @@ class MangaViewModel @Inject constructor(
         }
     }
 
-// Sửa lại phương thức applyTagFilter
-
     fun updateSelectedTags(tagId: String, selected: Boolean) {
         _selectedTags.update { currentTags ->
             if (selected) {
@@ -645,6 +650,12 @@ class MangaViewModel @Inject constructor(
             } else {
                 currentTags - tagId
             }
+        }
+    }
+
+    fun setTagFilterMode(mode: String) {
+        if (mode in listOf("AND", "OR")) {
+            _tagFilterMode.value = mode
         }
     }
 
@@ -656,14 +667,28 @@ class MangaViewModel @Inject constructor(
                 2 -> fetchTrendingManga(reset = true)
             }
         } else {
-            fetchRecommendedManga(includedTagIds = _selectedTags.value, reset = true)
+            viewModelScope.launch {
+                try {
+                    val result = repository.getMangaByTags(
+                        includedTags = _selectedTags.value,
+                        includedTagsMode = _tagFilterMode.value,
+                        limit = pageSize,
+                        offset = 0
+                    )
+                    result.onSuccess { response ->
+                        _mangas.value = response.data
+                    }.onFailure { e ->
+                        Log.e("MangaViewModel", "Error applying tag filter", e)
+                    }
+                } catch (e: Exception) {
+                    Log.e("MangaViewModel", "Unexpected error in applyTagFilter", e)
+                }
+            }
         }
     }
 
-    fun clearAllTags(){
+    fun clearAllTags() {
         _selectedTags.value = emptyList()
     }
-
-
 
 }
