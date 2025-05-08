@@ -16,6 +16,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.rememberNavController
+import com.android.dacs3.presentations.components.NetworkAwareContent
 import com.android.dacs3.presentations.navigation.AppNavGraph
 import com.android.dacs3.ui.theme.DACS3Theme
 import com.google.firebase.FirebaseApp
@@ -41,7 +42,9 @@ class MainActivity : ComponentActivity() {
             DACS3Theme {
                 Surface {
                     val navController = rememberNavController()
-                    AppNavGraph(navController)
+                    NetworkAwareContent {
+                        AppNavGraph(navController)
+                    }
                 }
             }
         }

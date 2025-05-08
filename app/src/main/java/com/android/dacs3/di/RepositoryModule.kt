@@ -8,6 +8,7 @@ import com.android.dacs3.data.repository.MangaRepository
 import com.android.dacs3.data.repositoryimpl.AuthRepositoryImpl
 import com.android.dacs3.data.repositoryimpl.FavouriteRepositoryImp
 import com.android.dacs3.data.repositoryimpl.MangaRepositoryImpl
+import com.android.dacs3.utliz.NetworkConnectivityManager
 import com.android.dacs3.utliz.SessionManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -66,6 +67,12 @@ object AppModule {
     @Provides
     fun provideSessionManager(@ApplicationContext context: Context): SessionManager {
         return SessionManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNetworkConnectivityManager(@ApplicationContext context: Context): NetworkConnectivityManager {
+        return NetworkConnectivityManager(context)
     }
 }
 

@@ -71,124 +71,102 @@ fun ProfileScreen(navController: NavController, viewModel: AuthViewModel) {
                     }
                 }
                 else -> {
-                    Column(
+                    // Avatar với nút edit được tách ra để hiển thị đúng
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFFF8F8F8))
-                            .padding(horizontal = 16.dp)
+                            .padding(start = 16.dp)
+                            .size(100.dp)
                     ) {
-                        // Avatar với nút edit được tách ra để hiển thị đúng
+                        // Avatar
                         Box(
                             modifier = Modifier
-                                .padding(start = 16.dp)
                                 .size(100.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            // Avatar
-                            Box(
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFE0E0E0)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (viewModel.currentUser?.avatar.isNullOrBlank()) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Default Avatar",
-                                        modifier = Modifier.size(60.dp),
-                                        tint = Color.DarkGray
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = viewModel.currentUser?.avatar,
-                                        contentDescription = "User Avatar",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                            }
-
-                            // Edit button được đặt ở góc dưới bên phải và đè lên ảnh
-                            if (viewModel.isUpdatingAvatar) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.5f))
-                                        .clip(CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(40.dp),
-                                        color = Color.White
-                                    )
-                                }
+                            if (viewModel.currentUser?.avatar.isNullOrBlank()) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Default Avatar",
+                                    modifier = Modifier.size(60.dp),
+                                    tint = Color.DarkGray
+                                )
                             } else {
-                                FloatingActionButton(
-                                    onClick = { imagePicker.launch("image/*") },
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .align(Alignment.BottomEnd)
-                                        .offset(x = 8.dp, y = 8.dp),
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = Color.White,
-                                    elevation = FloatingActionButtonDefaults.elevation(
-                                        defaultElevation = 4.dp
-                                    )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit Avatar",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                                AsyncImage(
+                                    model = viewModel.currentUser?.avatar,
+                                    contentDescription = "User Avatar",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Card with profile information
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        // Edit button được đặt ở góc dưới bên phải và đè lên ảnh
+                        FloatingActionButton(
+                            onClick = { imagePicker.launch("image/*") },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 8.dp, y = 8.dp),
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White,
+                            elevation = FloatingActionButtonDefaults.elevation(
+                                defaultElevation = 4.dp
+                            )
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                ProfileItem(label = "Full name", value = viewModel.currentUser?.fullname ?: "N/A")
-                                Divider(color = Color.LightGray, thickness = 0.5.dp)
-                                ProfileItem(label = "Nickname", value = viewModel.currentUser?.nickname ?: "N/A")
-                                Divider(color = Color.LightGray, thickness = 0.5.dp)
-                                ProfileItem(label = "Email", value = viewModel.currentUser?.email ?: "N/A")
-                            }
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Avatar",
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                        // Logout Button
-                        Card(
+                    // Card with profile information
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            ProfileItem(label = "Full name", value = viewModel.currentUser?.fullname ?: "N/A")
+                            Divider(color = Color.LightGray, thickness = 0.5.dp)
+                            ProfileItem(label = "Nickname", value = viewModel.currentUser?.nickname ?: "N/A")
+                            Divider(color = Color.LightGray, thickness = 0.5.dp)
+                            ProfileItem(label = "Email", value = viewModel.currentUser?.email ?: "N/A")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Logout Button
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.logout()
+                                navController.navigate(Screens.LoginScreen.route) {
+                                    popUpTo(Screens.SplashScreen.route) { inclusive = true }
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 32.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                                .height(50.dp)
+                                .padding(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Button(
-                                onClick = {
-                                    viewModel.logout()
-                                    navController.navigate(Screens.LoginScreen.route) {
-                                        popUpTo(Screens.SplashScreen.route) { inclusive = true }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp)
-                                    .padding(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
-                            }
+                            Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
