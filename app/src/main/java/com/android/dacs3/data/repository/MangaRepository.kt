@@ -51,4 +51,11 @@ interface MangaRepository {
     ): Result<MangaListResponse>
 
     suspend fun getTags(): Result<List<TagWrapper>>
+
+    suspend fun getMangaByTags(
+        includedTags: List<String>,
+        includedTagsMode: String = "AND",
+        limit: Int = 100,
+        offset: Int = 0
+    ): Result<MangaListResponse>
 }

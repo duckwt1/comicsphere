@@ -249,6 +249,23 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
-
+    override suspend fun getMangaByTags(
+        includedTags: List<String>,
+        includedTagsMode: String,
+        limit: Int,
+        offset: Int
+    ): Result<MangaListResponse> {
+        return try {
+            val response = api.getMangaByTags(
+                includedTags = includedTags,
+                includedTagsMode = includedTagsMode,
+                limit = limit,
+                offset = offset
+            )
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
 }
