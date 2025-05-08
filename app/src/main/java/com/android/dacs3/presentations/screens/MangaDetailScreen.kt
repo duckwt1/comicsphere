@@ -59,6 +59,8 @@ fun MangaDetailScreen(
 
     var isDescriptionExpanded by remember { mutableStateOf(false) }
 
+    var isChapterExpanded by remember { mutableStateOf(false) }
+
     // Observe the favorite state
     val isFavourite by favViewModel.isFavourite.observeAsState(false)
 
@@ -377,47 +379,111 @@ fun MangaChapters(
 ) {
     val context = LocalContext.current
 
-    Text(
-        text = "Chapters:",
-        fontWeight = FontWeight.Bold,
-        fontSize = 18.sp,
-        color = textColor
-    )
+    // Trạng thái mở rộng cho danh sách chapter
+    var isChapterExpanded by remember { mutableStateOf(false) }
 
-    Spacer(modifier = Modifier.height(8.dp))
+    // Số lượng chapter hiển thị ban đầu khi chưa mở rộng
+    val initialVisibleChapters = 5
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        chapters
-            .sortedByDescending { it.attributes.chapter?.toFloatOrNull() ?: 0f }
-            .forEach { chapter ->
-                TextButton(
-                    onClick = {
-                        val externalUrl = chapter.attributes.externalUrl
-                        if (externalUrl != null) {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(externalUrl))
-                            context.startActivity(intent)
-                        } else {
-                            navController.navigate(Screens.ChapterScreen.createRoute(mangaId ,chapter.id, chapter.attributes.translatedLanguage))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = textColor
-                    )
-                ) {
-                    Text(
-                        text = "Chapter ${chapter.attributes.chapter ?: "?"}: ${chapter.attributes.title.orEmpty()}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium
+    // Sắp xếp chapter theo thứ tự giảm dần
+    val sortedChapters = chapters.sortedByDescending { it.attributes.chapter?.toFloatOrNull() ?: 0f }
+
+    // Danh sách chapter sẽ hiển thị (giới hạn nếu chưa mở rộng)
+    val displayedChapters = if (isChapterExpanded) sortedChapters else sortedChapters.take(initialVisibleChapters)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Chapters:",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = textColor
+            )
+
+            // Chỉ hiển thị nút mở rộng khi số lượng chapter > initialVisibleChapters
+            if (sortedChapters.size > initialVisibleChapters) {
+                IconButton(onClick = { isChapterExpanded = !isChapterExpanded }) {
+                    Icon(
+                        imageVector = if (isChapterExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isChapterExpanded) "Collapse" else "Expand",
+                        tint = textColor
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                displayedChapters.forEach { chapter ->
+                    TextButton(
+                        onClick = {
+                            val externalUrl = chapter.attributes.externalUrl
+                            if (externalUrl != null) {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(externalUrl))
+                                context.startActivity(intent)
+                            } else {
+                                navController.navigate(Screens.ChapterScreen.createRoute(mangaId, chapter.id, chapter.attributes.translatedLanguage))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = textColor
+                        )
+                    ) {
+                        Text(
+                            text = "Chapter ${chapter.attributes.chapter ?: "?"}: ${chapter.attributes.title.orEmpty()}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                // Hiển thị nút "Xem thêm" hoặc "Thu gọn" khi có nhiều chapter
+                if (sortedChapters.size > initialVisibleChapters) {
+                    Button(
+                        onClick = { isChapterExpanded = !isChapterExpanded },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.LightGray.copy(alpha = 0.3f),
+                            contentColor = textColor
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = if (isChapterExpanded) "Collapse" else "View More ${sortedChapters.size - initialVisibleChapters} chapter",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Icon(
+                                imageVector = if (isChapterExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
-
 
