@@ -103,4 +103,8 @@ dependencies {
 
     implementation ("com.google.android.gms:play-services-base:18.2.0")
 
+    // Cloudinary
+    implementation ("com.cloudinary:cloudinary-android:2.3.1") // hoặc phiên bản mới nhất
+
+
 }

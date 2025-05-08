@@ -5,6 +5,6 @@ data class User(
     val email: String = "",
     val fullname: String = "",
     val nickname: String = "",
-    val avatarUrl: String = "",
+    val avatar: String = "",
     val createdAt: com.google.firebase.Timestamp? = null,
 )

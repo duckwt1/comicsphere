@@ -1,5 +1,6 @@
 package com.android.dacs3.data.repositoryimpl
 
+import com.android.dacs3.data.model.User
 import com.android.dacs3.data.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -45,6 +46,25 @@ class AuthRepositoryImpl @Inject constructor(
                 .await()
 
             Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getUserInfo(userId: String): Result<User> {
+        return try {
+            val document = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(userId)
+                .get()
+                .await()
+
+            if (document.exists()) {
+                val user = document.toObject(User::class.java)
+                Result.success(user!!)
+            } else {
+                Result.failure(Exception("User not found"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

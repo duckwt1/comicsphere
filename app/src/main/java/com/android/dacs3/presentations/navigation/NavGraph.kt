@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.android.dacs3.presentations.screens.*
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.presentations.screens.ProfileScreen
+import com.android.dacs3.viewmodel.AuthViewModel
 import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 
@@ -30,7 +31,10 @@ fun AppNavGraph(navController: NavHostController) {
 
         composable(Screens.FavouriteScreen.route) { FavouriteScreen(navController) }
         composable(Screens.ExploreScreen.route) { ExploreScreen(navController) }
-        composable(Screens.ProfileScreen.route) { ProfileScreen(navController) }
+        composable(Screens.ProfileScreen.route) {
+            val viewModel: AuthViewModel = hiltViewModel()
+            ProfileScreen(navController = navController,  viewModel)
+        }
         composable(Screens.SignUpScreen.route) { SignUpScreen(navController) }
 
         composable(

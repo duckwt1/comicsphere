@@ -189,10 +189,6 @@ fun MangaList(
             MangaItem(manga = manga, navController = navController)
         }
 
-        // Show Load More button if:
-        // 1. There are items
-        // 2. We have at least 3 items (to maintain grid layout)
-        // 3. If it's search results, only show if we have 21 or more items
         if (mangas.isNotEmpty() && mangas.size >= 3 && 
             ( mangas.size >= 15)) {
             item {
