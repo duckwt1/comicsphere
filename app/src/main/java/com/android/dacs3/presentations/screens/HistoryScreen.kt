@@ -1,36 +1,41 @@
 package com.android.dacs3.presentations.screens
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.android.dacs3.R
 import com.android.dacs3.data.model.ReadingProgress
 import com.android.dacs3.data.model.coverImageUrl
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
@@ -49,69 +54,157 @@ fun HistoryScreen(
     val readingProgress by viewModel.readingProgress.collectAsState()
     val mangaDetails by viewModel.mangaDetails.collectAsState()
     val chapterDetails by viewModel.chapterDetails.collectAsState()
+    val isDeleting by viewModel.isDeleting.collectAsState()
+    val deleteError by viewModel.deleteError.collectAsState()
 
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var selectedMangaId by remember { mutableStateOf<String?>(null) }
+    var showDeleteMangaDialog by remember { mutableStateOf(false) }
+    var showDropdownMenu by remember { mutableStateOf(false) }
 
-    // Debug logs for state changes
-    LaunchedEffect(readingProgress, mangaDetails, chapterDetails) {
-        Log.d("HistoryScreen", "State changed - ReadingProgress: ${readingProgress.size}, MangaDetails: ${mangaDetails.size}, ChapterDetails: ${chapterDetails.size}")
+    // Show error dialog if there's a deletion error
+    deleteError?.let { errorMessage ->
+        AlertDialog(
+            onDismissRequest = { viewModel._deleteError.value = null },
+            title = { Text("Error") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                TextButton(onClick = { viewModel._deleteError.value = null }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
+    // Lấy dữ liệu lịch sử đọc mới nhất cho mỗi manga
     val latestProgressByManga = readingProgress
         .groupBy { it.mangaId }
         .mapValues { entry -> entry.value.maxByOrNull { it.timestamp }!! }
         .values
         .sortedByDescending { it.timestamp }
 
-    // Debug log for latest progress
-    LaunchedEffect(latestProgressByManga) {
-        Log.d("HistoryScreen", "Latest progress items: ${latestProgressByManga.size}")
-        latestProgressByManga.forEach { progress ->
-            val hasManga = mangaDetails.containsKey(progress.mangaId)
-            val hasChapter = chapterDetails.containsKey(progress.chapterId)
-            Log.d("HistoryScreen", "Progress ${progress.mangaId}: hasManga=$hasManga, hasChapter=$hasChapter")
-        }
-    }
-
+    // Nhóm lịch sử đọc theo ngày
     val groupedHistory = latestProgressByManga
         .groupBy { progress -> viewModel.formatHistoryDate(progress.timestamp) }
 
-    // Debug log for grouped history
-    LaunchedEffect(groupedHistory) {
-        Log.d("HistoryScreen", "Grouped history items: ${groupedHistory.size}")
-        groupedHistory.forEach { (date, progresses) ->
-            Log.d("HistoryScreen", "Date $date: ${progresses.size} items")
-        }
-    }
-
+    // Load dữ liệu khi vào màn hình
     LaunchedEffect(Unit) {
         try {
             isLoading = true
             viewModel.loadReadingProgress()
-            // Don't set isLoading to false here, let it be controlled by the data loading state
         } catch (e: Exception) {
             error = e.message ?: "An error occurred"
             isLoading = false
         }
     }
 
-    // Update loading state based on data availability
+    // Cập nhật trạng thái loading dựa trên việc tải dữ liệu
     LaunchedEffect(readingProgress, mangaDetails, chapterDetails) {
-        val hasData = readingProgress.isNotEmpty() && 
-                     mangaDetails.isNotEmpty() && 
-                     chapterDetails.isNotEmpty()
-        isLoading = !hasData
+        val hasData = readingProgress.isNotEmpty() &&
+                mangaDetails.isNotEmpty() &&
+                chapterDetails.isNotEmpty()
+        isLoading = !hasData && !isDeleting
+    }
+
+    // Dialog xác nhận xoá tất cả lịch sử
+    if (showDeleteAllDialog) {
+        DeleteConfirmationDialog(
+            title = "Delete All History",
+            message = "Are you sure you want to delete your entire reading history? This action cannot be undone.",
+            onConfirm = {
+                viewModel.deleteAllMangaReadingProgress()
+                showDeleteAllDialog = false
+            },
+            onDismiss = { showDeleteAllDialog = false }
+        )
+    }
+
+    // Dialog xác nhận xoá lịch sử của một manga
+    if (showDeleteMangaDialog && selectedMangaId != null) {
+        val mangaTitle = mangaDetails[selectedMangaId]?.attributes?.title?.get("en")
+            ?: mangaDetails[selectedMangaId]?.attributes?.title?.values?.firstOrNull()
+            ?: "this manga"
+
+        DeleteConfirmationDialog(
+            title = "Delete Manga History",
+            message = "Are you sure you want to delete the reading history of \"$mangaTitle\"? This action cannot be undone.",
+            onConfirm = {
+                selectedMangaId?.let { mangaId ->
+                    // Get all chapters for this manga
+                    val mangaChapters = readingProgress.filter { it.mangaId == mangaId }
+                    mangaChapters.forEach { progress ->
+                        viewModel.deleteReadingProgress(
+                            mangaId = progress.mangaId,
+                            chapterId = progress.chapterId,
+                            language = progress.language
+                        )
+                    }
+                }
+                showDeleteMangaDialog = false
+                selectedMangaId = null
+            },
+            onDismiss = {
+                showDeleteMangaDialog = false
+                selectedMangaId = null
+            }
+        )
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reading History") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_history),
+                            contentDescription = null,
+                            tint = Color(0xFF333333),
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Reading History", color = Color(0xFF333333))
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFFF8F8F8),
                     titleContentColor = Color.Black
-                )
+                ),
+                actions = {
+                    // Menu dropdown for delete all history
+                    Box {
+                        IconButton(onClick = { showDropdownMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = Color(0xFF333333)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showDropdownMenu,
+                            onDismissRequest = { showDropdownMenu = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Delete All History", color = Color(0xFF333333)) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete All",
+                                        tint = Color(0xFF333333)
+                                    )
+                                },
+                                onClick = {
+                                    showDropdownMenu = false
+                                    showDeleteAllDialog = true
+                                }
+                            )
+                        }
+                    }
+
+                }
             )
         },
         bottomBar = { BottomNavigationBar(navController) }
@@ -128,75 +221,24 @@ fun HistoryScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 error != null -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "Error",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = error!!,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
+                    ErrorDisplay(errorMessage = error!!)
                 }
                 latestProgressByManga.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Empty History",
-                                tint = Color.Gray,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "No reading history found",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.Gray
-                            )
-                        }
-                    }
+                    EmptyHistoryDisplay()
                 }
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         groupedHistory.forEach { (date, progresses) ->
                             item {
-                                Text(
-                                    text = date,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF666666)
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp)
-                                )
+                                DateHeader(date = date)
                             }
 
                             items(progresses) { progress ->
@@ -209,23 +251,37 @@ fun HistoryScreen(
                                     val chapterTitle = chapter.attributes.title ?: ""
                                     val imageUrl = manga.coverImageUrl ?: ""
 
-                                    HistoryItem(
-                                        title = title,
-                                        chapterNumber = chapterNumber,
-                                        chapterTitle = chapterTitle,
-                                        imageUrl = imageUrl,
-                                        timestamp = progress.timestamp,
-                                        onClick = {
-                                            navController.navigate(Screens.DetailsScreen.createRoute(manga.id))
-                                        },
-                                        onDelete = {
-                                            viewModel.deleteReadingProgress(
-                                                mangaId = progress.mangaId,
-                                                chapterId = progress.chapterId,
-                                                language = progress.language
+                                    key(progress.mangaId + progress.chapterId) {
+                                        AnimatedVisibility(
+                                            visible = true,
+                                            enter = fadeIn(animationSpec = tween(300)) +
+                                                    slideInHorizontally(animationSpec = tween(300)) { it },
+                                            exit = fadeOut(animationSpec = tween(300)) +
+                                                    slideOutHorizontally(animationSpec = tween(300)) { it }
+                                        ) {
+                                            HistoryItem(
+                                                title = title,
+                                                chapterNumber = chapterNumber,
+                                                chapterTitle = chapterTitle,
+                                                imageUrl = imageUrl,
+                                                timestamp = progress.timestamp,
+                                                onClick = {
+                                                    navController.navigate(Screens.DetailsScreen.createRoute(manga.id))
+                                                },
+                                                onDelete = {
+                                                    viewModel.deleteReadingProgress(
+                                                        mangaId = progress.mangaId,
+                                                        chapterId = progress.chapterId,
+                                                        language = progress.language
+                                                    )
+                                                },
+                                                onDeleteAllManga = {
+                                                    selectedMangaId = progress.mangaId
+                                                    showDeleteMangaDialog = true
+                                                }
                                             )
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -237,6 +293,43 @@ fun HistoryScreen(
 }
 
 @Composable
+fun DateHeader(date: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Divider(
+            modifier = Modifier
+                .weight(0.2f)
+                .height(1.dp),
+            color = Color(0xFFDDDDDD)
+        )
+
+        Text(
+            text = date,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF666666)
+            ),
+            modifier = Modifier
+                .weight(0.6f)
+                .padding(horizontal = 8.dp),
+            textAlign = TextAlign.Center
+        )
+
+        Divider(
+            modifier = Modifier
+                .weight(0.2f)
+                .height(1.dp),
+            color = Color(0xFFDDDDDD)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun HistoryItem(
     title: String,
     chapterNumber: String,
@@ -244,19 +337,26 @@ fun HistoryItem(
     imageUrl: String,
     timestamp: Long,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDeleteAllManga: () -> Unit
 ) {
+    var showOptions by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .shadow(
+                elevation = 2.dp,
+                shape = RoundedCornerShape(12.dp),
+                spotColor = Color(0x1A000000)
+            )
             .clickable { onClick() },
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
+            defaultElevation = 0.dp
         )
     ) {
         Row(
@@ -264,29 +364,33 @@ fun HistoryItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Cover image
             AsyncImage(
                 model = imageUrl,
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(MaterialTheme.shapes.medium)
+                    .size(80.dp, 120.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .shadow(1.dp, RoundedCornerShape(8.dp))
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
+            // Content
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
                     text = "Chapter $chapterNumber${if (chapterTitle.isNotEmpty()) ": $chapterTitle" else ""}",
@@ -298,24 +402,191 @@ fun HistoryItem(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Text(
-                    text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF999999)
-                )
+                // Read time with better format
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Read at ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF999999)
+                    )
+                }
             }
 
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.padding(start = 8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color(0xFF999999)
-                )
+            // Delete options
+            Box {
+                IconButton(
+                    onClick = { showOptions = !showOptions }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options",
+                        tint = Color(0xFF999999)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showOptions,
+                    onDismissRequest = { showOptions = false },
+                    modifier = Modifier.background(Color.White)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Delete this chapter") },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = "Delete") },
+                        onClick = {
+                            showOptions = false
+                            onDelete()
+                        }
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Delete all history of this manga") },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = "Delete All") },
+                        onClick = {
+                            showOptions = false
+                            onDeleteAllManga()
+                        }
+                    )
+                }
             }
         }
     }
 }
 
+@Composable
+fun ErrorDisplay(errorMessage: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Clear,
+                contentDescription = "Error",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun EmptyHistoryDisplay() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Home,
+                contentDescription = "Empty History",
+                tint = Color.Gray,
+                modifier = Modifier.size(72.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No reading history yet",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Start reading manga and your history will appear here",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun DeleteConfirmationDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(40.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Cancel", color = Color.Black)
+                    }
+
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black
+                        )
+                    ) {
+                        Text("Delete", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}

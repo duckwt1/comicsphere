@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -16,16 +15,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.android.dacs3.R
 import com.android.dacs3.utliz.Screens
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
-
 
 @Composable
 fun BottomNavigationBar(navController: NavController) {
@@ -35,101 +35,155 @@ fun BottomNavigationBar(navController: NavController) {
     val systemUiController = rememberSystemUiController()
     systemUiController.setSystemBarsColor(color = Color.Transparent, darkIcons = true)
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(70.dp)
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Color(0xFFF5F5F5))
-            .shadow(elevation = 4.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
+            .height(80.dp) // Tăng chiều cao một chút
+            .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+            .background(Color.White)
+            .shadow(
+                elevation = 20.dp,
+                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                spotColor = Color(0x1A000000)
+            )
     ) {
-        Spacer(modifier = Modifier.padding(start = 15.dp))
-
-        BottomNavItem(
-            icon = Icons.Filled.Home,
-            label = "History",
-            isSelected = currentRoute == Screens.HistoryScreen.route
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            navController.navigate(Screens.HistoryScreen.route) {
-                popUpTo(navController.graph.startDestinationId)
-                launchSingleTop = true
+            // History item (using drawable resource)
+            BottomNavItemWithDrawable(
+                drawableRes = R.drawable.ic_history,
+                label = "History",
+                isSelected = currentRoute == Screens.HistoryScreen.route
+            ) {
+                navController.navigate(Screens.HistoryScreen.route) {
+                    popUpTo(navController.graph.startDestinationId)
+                    launchSingleTop = true
+                }
+            }
+
+            // Favourite item
+            BottomNavItem(
+                icon = Icons.Filled.Favorite,
+                label = "Favourite",
+                isSelected = currentRoute == Screens.FavouriteScreen.route
+            ) {
+                navController.navigate(Screens.FavouriteScreen.route) {
+                    popUpTo(navController.graph.startDestinationId)
+                    launchSingleTop = true
+                }
+            }
+
+            // Explore item
+            BottomNavItem(
+                icon = Icons.Filled.Search,
+                label = "Explore",
+                isSelected = currentRoute == Screens.ExploreScreen.route
+            ) {
+                navController.navigate(Screens.ExploreScreen.route) {
+                    popUpTo(navController.graph.startDestinationId)
+                    launchSingleTop = true
+                }
+            }
+
+            // Profile item
+            BottomNavItem(
+                icon = Icons.Filled.Person,
+                label = "Profile",
+                isSelected = currentRoute == Screens.ProfileScreen.route
+            ) {
+                navController.navigate(Screens.ProfileScreen.route) {
+                    popUpTo(navController.graph.startDestinationId)
+                    launchSingleTop = true
+                }
             }
         }
-
-        BottomNavItem(
-            icon = Icons.Filled.Favorite,
-            label = "Favourite",
-            isSelected = currentRoute == Screens.FavouriteScreen.route
-        ) {
-            navController.navigate(Screens.FavouriteScreen.route) {
-                popUpTo(navController.graph.startDestinationId)
-                launchSingleTop = true
-            }
-        }
-
-        BottomNavItem(
-            icon = Icons.Filled.Search,
-            label = "Explore",
-            isSelected = currentRoute == Screens.ExploreScreen.route
-        ) {
-            navController.navigate(Screens.ExploreScreen.route) {
-                popUpTo(navController.graph.startDestinationId)
-                launchSingleTop = true
-            }
-        }
-
-        BottomNavItem(
-            icon = Icons.Filled.Person,
-            label = "Profile",
-            isSelected = currentRoute == Screens.ProfileScreen.route
-        ) {
-            navController.navigate(Screens.ProfileScreen.route) {
-                popUpTo(navController.graph.startDestinationId)
-                launchSingleTop = true
-            }
-        }
-
-        Spacer(modifier = Modifier.padding(end = 15.dp))
     }
 }
 
 @Composable
 fun BottomNavItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFE0C3FC), Color(0xFF8EC5FC))
-    )
-    val transparentBrush = SolidColor(Color.Transparent) // Use SolidColor for transparent background
+    val backgroundColor = if (isSelected) Color(0xFF444444) else Color.Transparent
 
     Column(
         modifier = Modifier
             .clickable { onClick() }
-            .padding(8.dp),
+            .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(brush = if (isSelected) gradient else transparentBrush),
+                .size(50.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(backgroundColor),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isSelected) Color.White else Color(0xFF052224)
+                tint = if (isSelected) Color.White else Color(0xFF000000),
+                modifier = Modifier.size(24.dp)
             )
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
         Text(
             text = label,
             fontSize = 12.sp,
-            color = if (isSelected) Color(0xFF00D09E) else Color(0xFF052224)
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) Color.White else Color(0xFF000000)
+        )
+    }
+}
+
+@Composable
+fun BottomNavItemWithDrawable(
+    drawableRes: Int,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val primaryColor = Color(0xFF626262) // Màu xám nhẹ
+    val backgroundColor = if (isSelected) Color(0xFF7E7E7E) else Color.Transparent
+
+    Column(
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(backgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = drawableRes),
+                contentDescription = label,
+                tint = if (isSelected) Color.White else Color(0xFF000000),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) Color.White else Color(0xFF000000)
         )
     }
 }

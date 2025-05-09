@@ -42,6 +42,11 @@ interface MangaRepository {
         language: String
     ): Result<Boolean>
 
+    suspend fun deleteAllMangaReadingProgress(
+        userId: String,
+        mangaId: String
+    ): Result<Boolean>
+
     suspend fun fetchTrendingManga(limit: Int, offset: Int): Result<MangaListResponse>
 
     suspend fun fetchRecommendedManga(

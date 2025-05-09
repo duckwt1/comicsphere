@@ -535,19 +535,56 @@ class MangaViewModel @Inject constructor(
     fun deleteReadingProgress(mangaId: String, chapterId: String, language: String) {
         viewModelScope.launch {
             try {
-                val userId = firebaseAuth.currentUser?.uid ?: return@launch
-
-                Log.d("MangaViewModel", "Deleting reading progress for manga=$mangaId, chapter=$chapterId")
-
-                repository.deleteReadingProgress(userId, mangaId, chapterId, language).onSuccess {
-                    Log.d("MangaViewModel", "Successfully deleted reading progress")
-                    // Reload reading progress after deletion
-                    loadReadingProgress(true)
-                }.onFailure { e ->
-                    Log.e("MangaViewModel", "Error deleting reading progress", e)
-                }
+                _isDeleting.value = true
+                _deleteError.value = null
+                
+                val userId = firebaseAuth.currentUser?.uid ?: throw Exception("User not authenticated")
+                
+                repository.deleteReadingProgress(userId, mangaId, chapterId, language)
+                
+                // Reload reading progress
+                loadReadingProgress(true)
             } catch (e: Exception) {
-                Log.e("MangaViewModel", "Unexpected error in deleteReadingProgress", e)
+                _deleteError.value = e.message ?: "Failed to delete reading progress"
+                Log.e("MangaViewModel", "Error deleting reading progress", e)
+            } finally {
+                _isDeleting.value = false
+            }
+        }
+    }
+
+    private val _isDeleting = MutableStateFlow(false)
+    val isDeleting: StateFlow<Boolean> = _isDeleting
+
+    val _deleteError = MutableStateFlow<String?>(null)
+    val deleteError: StateFlow<String?> = _deleteError
+
+    fun deleteAllMangaReadingProgress() {
+        viewModelScope.launch {
+            try {
+                _isDeleting.value = true
+                _deleteError.value = null
+                
+                val userId = firebaseAuth.currentUser?.uid ?: throw Exception("User not authenticated")
+                
+                // Get all unique manga IDs from reading progress
+                val mangaIds = _readingProgress.value
+                    .groupBy { it.mangaId }
+                    .keys
+                    .toList()
+                
+                // Delete reading progress for each manga
+                mangaIds.forEach { mangaId ->
+                    repository.deleteAllMangaReadingProgress(userId, mangaId)
+                }
+                
+                // Reload reading progress
+                loadReadingProgress(true)
+            } catch (e: Exception) {
+                _deleteError.value = e.message ?: "Failed to delete reading history"
+                Log.e("MangaViewModel", "Error deleting all reading progress", e)
+            } finally {
+                _isDeleting.value = false
             }
         }
     }

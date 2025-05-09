@@ -217,6 +217,34 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteAllMangaReadingProgress(
+        userId: String,
+        mangaId: String
+    ): Result<Boolean> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Deleting all reading progress for user=$userId, manga=$mangaId")
+
+            val querySnapshot = firestore.collection("users")
+                .document(userId)
+                .collection("readingProgress")
+                .whereEqualTo("mangaId", mangaId)
+                .get()
+                .await()
+
+            val batch = firestore.batch()
+            querySnapshot.documents.forEach { doc ->
+                batch.delete(doc.reference)
+            }
+            batch.commit().await()
+
+            Log.d("MangaRepositoryImpl", "Successfully deleted all reading progress for manga")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error deleting all reading progress", e)
+            Result.failure(e)
+        }
+    }
+
     override suspend fun fetchTrendingManga(limit: Int, offset: Int): Result<MangaListResponse> {
         return try {
             val response = api.getTrendingManga(
