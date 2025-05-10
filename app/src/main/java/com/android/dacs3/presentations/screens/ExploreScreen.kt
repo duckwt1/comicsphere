@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,11 +23,11 @@ import androidx.navigation.NavController
 import com.android.dacs3.R
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.TagWrapper
+import com.android.dacs3.presentations.components.MangaItem
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.viewmodel.MangaViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
-import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -58,7 +56,7 @@ fun ExploreScreen(
     Scaffold(
         topBar = {
             Column {
-                SearchBar(
+                com.android.dacs3.presentations.components.SearchBar(
                     modifier = Modifier.padding(8.dp),
                     onSearch = { query ->
                         searchQuery = query

@@ -1,4 +1,4 @@
-package com.android.dacs3.presentations.screens
+package com.android.dacs3.presentations.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
