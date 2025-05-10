@@ -161,14 +161,14 @@ fun HistoryScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_history),
-                            contentDescription = null,
-                            tint = Color(0xFF333333),
-                            modifier = Modifier.size(28.dp)
-                        )
+//                        Icon(
+//                            painter = painterResource(id = R.drawable.ic_history),
+//                            contentDescription = null,
+//                            tint = Color(0xFF333333),
+//                            modifier = Modifier.size(28.dp)
+//                        )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("Reading History", color = Color(0xFF333333))
+                        Text("Reading History", fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

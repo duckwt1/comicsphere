@@ -7,4 +7,5 @@ interface FavouriteRepository {
     suspend fun addFavourite(userId: String, mangaId: String): Result<Boolean>
     suspend fun removeFavourite(userId: String, mangaId: String): Result<Boolean>
     suspend fun getMangaById(id: String): Result<MangaData>
+    suspend fun deleteAllFavourites(userId: String): Result<Boolean>
 }

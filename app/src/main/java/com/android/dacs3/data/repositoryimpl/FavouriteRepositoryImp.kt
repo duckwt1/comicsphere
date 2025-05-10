@@ -72,4 +72,25 @@ class FavouriteRepositoryImp @Inject constructor(
         }
     }
 
+    override suspend fun deleteAllFavourites(userId: String): Result<Boolean> {
+        return try {
+            val db = FirebaseFirestore.getInstance()
+            val favRef = db.collection("users")
+                .document(userId)
+                .collection("favourite")
+
+            val snapshot = favRef.get().await()
+            val batch = db.batch()
+            
+            snapshot.documents.forEach { doc ->
+                batch.delete(doc.reference)
+            }
+            
+            batch.commit().await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
 }

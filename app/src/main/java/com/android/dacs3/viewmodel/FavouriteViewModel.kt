@@ -32,6 +32,9 @@ class FavouriteViewModel @Inject constructor(
     private val _isFavourite = MutableLiveData<Boolean>()
     val isFavourite: LiveData<Boolean> = _isFavourite
 
+    private val _isDeleting = MutableLiveData<Boolean>(false)
+    val isDeleting: LiveData<Boolean> = _isDeleting
+
     fun loadFavourites() {
         val userId = firebaseAuth.currentUser?.uid
         if (userId != null) {
@@ -140,6 +143,27 @@ class FavouriteViewModel @Inject constructor(
             }
         } else {
             _isFavourite.value = false
+        }
+    }
+
+    fun deleteAllFavourites() {
+        val userId = firebaseAuth.currentUser?.uid
+        if (userId != null) {
+            viewModelScope.launch {
+                _isDeleting.value = true
+                _loading.value = true
+                val result = repository.deleteAllFavourites(userId)
+                if (result.isSuccess) {
+                    // Clear local lists
+                    _favourites.value = emptyList()
+                    _mangaDetails.value = emptyList()
+                    _error.value = null
+                } else {
+                    _error.value = result.exceptionOrNull()?.message
+                }
+                _loading.value = false
+                _isDeleting.value = false
+            }
         }
     }
 
