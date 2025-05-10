@@ -26,8 +26,7 @@ It allows users to discover trending manga, track reading progress, manage favor
 - ✅ **Multi-language Support**
 
 ## 📱 Installation
-
-1. Go to the **Releases** tab on GitHub  
+1. Go to the [Releases](https://github.com/duckwt1/ComicSphere/releases) section of our GitHub repository
 2. Download the latest **APK**  
 3. Install on your Android device  
 > ⚠️ Make sure to enable *Install from unknown sources* in settings.
@@ -73,6 +72,7 @@ ComicSphere is currently in **active development**.
 
 - 📖 **MangaDex API** – Manga data and chapters  
 - 🔐 **Firebase** – User data, auth, and cloud storage
+- 🖼️ Cloudinary – User avatar
 
 ## 🤝 Contributing
 
