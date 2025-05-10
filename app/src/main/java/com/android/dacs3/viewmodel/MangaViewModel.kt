@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.model.*
+import com.android.dacs3.data.repository.AuthRepository
 import com.android.dacs3.data.repository.MangaRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,11 +22,14 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 @HiltViewModel
 class MangaViewModel @Inject constructor(
     private val repository: MangaRepository,
-    private val firebaseAuth: FirebaseAuth
+    private val authRepository: AuthRepository,
+    private val firebaseAuth: FirebaseAuth,
 ) : ViewModel() {
 
     private val _mangas = MutableStateFlow<List<MangaData>>(emptyList())
@@ -78,6 +82,30 @@ class MangaViewModel @Inject constructor(
     // Load chapter details
     private val _chapterDetails = MutableStateFlow<Map<String, ChapterData>>(emptyMap())
     val chapterDetails: StateFlow<Map<String, ChapterData>> = _chapterDetails
+
+    // Sửa lại các state flows cho comments
+    private val _comments = MutableStateFlow<List<Comment>>(emptyList())
+    val comments: StateFlow<List<Comment>> = _comments.asStateFlow()
+
+    private val _commentError = MutableStateFlow<String?>(null)
+    val commentError: StateFlow<String?> = _commentError.asStateFlow()
+
+    private val _isLoadingComments = MutableStateFlow(false)
+    val isLoadingComments: StateFlow<Boolean> = _isLoadingComments.asStateFlow()
+
+    private val _commentActionInProgress = MutableStateFlow(false)
+    val commentActionInProgress: StateFlow<Boolean> = _commentActionInProgress.asStateFlow()
+
+    // Biến để lưu mangaId hiện tại
+    private var currentMangaId: String? = null
+
+    // Thêm các state để lưu thông tin người dùng
+    private val _userDetails = MutableStateFlow<Map<String, User>>(emptyMap())
+    val userDetails: StateFlow<Map<String, User>> = _userDetails.asStateFlow()
+
+    // Thêm state để lưu trữ thông tin like của người dùng
+    private val _userLikes = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val userLikes: StateFlow<Map<String, Boolean>> = _userLikes.asStateFlow()
 
     init {
         fetchMangaList()
@@ -728,4 +756,133 @@ class MangaViewModel @Inject constructor(
         _selectedTags.value = emptyList()
     }
 
+    // Hàm để lấy comments cho một manga
+    fun loadComments(mangaId: String) {
+        currentMangaId = mangaId
+        viewModelScope.launch {
+            _isLoadingComments.value = true
+            _commentError.value = null
+
+            try {
+                repository.getComments(mangaId).onSuccess { commentList ->
+                    Log.d("MangaViewModel", "Comments loaded successfully: ${commentList.size} comments")
+                    _comments.value = commentList
+
+                }.onFailure { exception ->
+                    _commentError.value = exception.message ?: "Failed to load comments"
+                    Log.e("MangaViewModel", "Error loading comments", exception)
+                }
+            } catch (e: Exception) {
+                _commentError.value = e.message ?: "An unexpected error occurred"
+                Log.e("MangaViewModel", "Exception loading comments", e)
+            } finally {
+                _isLoadingComments.value = false
+            }
+        }
+    }
+
+    // Hàm để thêm comment mới
+    fun addComment(mangaId: String, content: String) {
+        if (!isUserLoggedIn()) return
+        
+        val userId = firebaseAuth.currentUser?.uid ?: return
+        
+        if (content.isBlank()) {
+            _commentError.value = "Comment cannot be empty"
+            return
+        }
+        
+        viewModelScope.launch {
+            _commentActionInProgress.value = true
+            _commentError.value = null
+            
+            try {
+                // Lấy thông tin user từ AuthRepository
+                authRepository.getUserInfo(userId).onSuccess { user ->
+                    // Update userDetails immediately
+                    _userDetails.update { currentMap ->
+                        currentMap + (userId to user)
+                    }
+                    
+                    repository.addComment(mangaId, userId, user.nickname, content).onSuccess {
+                        // Reload comments to show the new one
+                        loadComments(mangaId)
+                    }.onFailure { exception ->
+                        _commentError.value = exception.message ?: "Failed to add comment"
+                        Log.e("MangaViewModel", "Error adding comment", exception)
+                    }
+                }.onFailure { exception ->
+                    _commentError.value = exception.message ?: "Failed to get user info"
+                    Log.e("MangaViewModel", "Error getting user info", exception)
+                }
+            } catch (e: Exception) {
+                _commentError.value = e.message ?: "An unexpected error occurred"
+                Log.e("MangaViewModel", "Exception adding comment", e)
+            } finally {
+                _commentActionInProgress.value = false
+            }
+        }
+    }
+
+    // Hàm để xóa comment
+    fun deleteComment(commentId: String) {
+        if (!isUserLoggedIn()) return
+        
+        val mangaId = currentMangaId ?: return
+        val userId = firebaseAuth.currentUser?.uid ?: return
+        
+        viewModelScope.launch {
+            _commentActionInProgress.value = true
+            _commentError.value = null
+            
+            try {
+                // Kiểm tra xem comment có tồn tại và thuộc về user hiện tại không
+                val comment = _comments.value.find { it.id == commentId }
+                if (comment == null) {
+                    _commentError.value = "Comment not found"
+                    return@launch
+                }
+                
+                if (comment.userId != userId) {
+                    _commentError.value = "You can only delete your own comments"
+                    return@launch
+                }
+                
+                repository.deleteComment(mangaId, commentId).onSuccess {
+                    // Reload comments after deletion
+                    loadComments(mangaId)
+                }.onFailure { exception ->
+                    _commentError.value = exception.message ?: "Failed to delete comment"
+                    Log.e("MangaViewModel", "Error deleting comment", exception)
+                }
+            } catch (e: Exception) {
+                _commentError.value = e.message ?: "An unexpected error occurred"
+                Log.e("MangaViewModel", "Exception deleting comment", e)
+            } finally {
+                _commentActionInProgress.value = false
+            }
+        }
+    }
+
+    // Hàm để xóa lỗi comment
+    fun clearCommentError() {
+        _commentError.value = null
+    }
+
+    // Kiểm tra người dùng đã đăng nhập chưa
+    private fun isUserLoggedIn(): Boolean {
+        val isLoggedIn = firebaseAuth.currentUser != null
+        if (!isLoggedIn) {
+            _commentError.value = "You must be logged in to perform this action"
+        }
+        return isLoggedIn
+    }
 }
+
+
+
+
+
+
+
+

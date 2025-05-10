@@ -2,10 +2,12 @@ package com.android.dacs3.data.repository
 
 import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterData
+import com.android.dacs3.data.model.Comment
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
 import com.android.dacs3.data.model.ReadingProgress
 import com.android.dacs3.data.model.TagWrapper
+import com.android.dacs3.data.model.User
 
 interface MangaRepository {
     suspend fun fetchMangaList(limit: Int, offset: Int): Result<MangaListResponse>
@@ -63,4 +65,21 @@ interface MangaRepository {
         limit: Int = 100,
         offset: Int = 0
     ): Result<MangaListResponse>
+
+    suspend fun addComment(
+        mangaId: String,
+        userId: String,
+        nickname: String,
+        content: String
+    ): Result<Boolean>
+
+    suspend fun getComments(mangaId: String): Result<List<Comment>>
+
+    suspend fun deleteComment(mangaId: String, commentId: String): Result<Boolean>
+
+    suspend fun likeComment(mangaId: String, commentId: String, userId: String): Result<Boolean>
+
+    suspend fun checkIfUserLikedComment(commentId: String, userId: String): Result<Boolean>
+
+    suspend fun getUserInfo(userId: String): Result<User>
 }

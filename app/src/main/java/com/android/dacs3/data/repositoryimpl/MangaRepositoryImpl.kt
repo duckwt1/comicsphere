@@ -12,9 +12,12 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.util.Log
+import com.android.dacs3.data.model.Comment
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.ReadingProgress
 import com.android.dacs3.data.model.TagWrapper
+import com.android.dacs3.data.model.User
+import com.google.firebase.auth.FirebaseAuth
 
 @Singleton
 class MangaRepositoryImpl @Inject constructor(
@@ -291,6 +294,223 @@ class MangaRepositoryImpl @Inject constructor(
                 offset = offset
             )
             Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun addComment(
+        mangaId: String,
+        userId: String,
+        nickname: String,
+        content: String
+    ): Result<Boolean> {
+        return try {
+            // Lấy thông tin người dùng để có avatar
+            var userAvatar: String? = null
+            try {
+                val userResult = getUserInfo(userId)
+                if (userResult.isSuccess) {
+                    userAvatar = userResult.getOrNull()?.avatar
+                }
+            } catch (e: Exception) {
+                Log.e("MangaRepositoryImpl", "Error getting user avatar", e)
+            }
+
+            // Tạo document reference mới
+            val commentRef = firestore.collection("manga")
+                .document(mangaId)
+                .collection("comments")
+                .document()
+            
+            val commentId = commentRef.id
+            val timestamp = System.currentTimeMillis()
+
+            val commentData = hashMapOf(
+                "userId" to userId,
+                "comment" to content,
+                "timestamp" to timestamp,
+                "likes" to 0,
+                "isEdited" to false,
+                "nickname" to nickname,
+                "avatar" to userAvatar
+            )
+
+            commentRef.set(commentData).await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error adding comment", e)
+            Result.failure(e)
+        }
+    }
+
+
+    override suspend fun getComments(mangaId: String): Result<List<Comment>> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Getting comments for manga: $mangaId") // Thêm log này
+            val querySnapshot = firestore.collection("manga")
+                .document(mangaId)
+                .collection("comments")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            Log.d("MangaRepositoryImpl", "Comments query returned ${querySnapshot.documents.size} documents") // Thêm log này
+
+            val comments = querySnapshot.documents.mapNotNull { doc ->
+                try {
+                    val id = doc.id
+                    val userId = doc.getString("userId") ?: return@mapNotNull null
+                    val comment = doc.getString("comment") ?: return@mapNotNull null
+                    val timestamp = doc.getLong("timestamp") ?: return@mapNotNull null
+                    val likes = doc.getLong("likes")?.toInt() ?: 0
+                    val isEdited = doc.getBoolean("isEdited") ?: false
+                    val nickname = doc.getString("nickname") ?: "Anonymous"
+                    val avatar = doc.getString("avatar")
+
+                    Comment(
+                        id = id,
+                        userId = userId,
+                        mangaId = mangaId,
+                        comment = comment,
+                        timestamp = timestamp,
+                        likes = likes,
+                        isEdited = isEdited,
+                        nickname = nickname,
+                        avatar = avatar
+                    )
+                } catch (e: Exception) {
+                    Log.e("MangaRepositoryImpl", "Error parsing comment", e)
+                    null
+                }
+            }
+
+            Result.success(comments)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error getting comments", e)
+            Result.failure(e)
+        }
+    }
+
+
+    override suspend fun deleteComment(mangaId: String, commentId: String): Result<Boolean> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Attempting to delete comment: mangaId=$mangaId, commentId=$commentId")
+            
+            // Lấy thông tin comment trước khi xóa để kiểm tra quyền
+            val commentDoc = firestore.collection("manga")
+                .document(mangaId)
+                .collection("comments")
+                .document(commentId)
+                .get()
+                .await()
+            
+            if (!commentDoc.exists()) {
+                Log.e("MangaRepositoryImpl", "Comment not found: $commentId")
+                return Result.failure(Exception("Comment not found"))
+            }
+            
+            val userId = commentDoc.getString("userId")
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            
+            Log.d("MangaRepositoryImpl", "Comment userId=$userId, currentUserId=$currentUserId")
+            
+            if (userId != currentUserId) {
+                Log.e("MangaRepositoryImpl", "Permission denied: Comment belongs to $userId, current user is $currentUserId")
+                return Result.failure(Exception("You can only delete your own comments"))
+            }
+            
+            // Xóa comment
+            Log.d("MangaRepositoryImpl", "Deleting comment: $commentId")
+            firestore.collection("manga")
+                .document(mangaId)
+                .collection("comments")
+                .document(commentId)
+                .delete()
+                .await()
+            
+            Log.d("MangaRepositoryImpl", "Comment deleted successfully")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error deleting comment", e)
+            Result.failure(e)
+        }
+    }
+
+
+    override suspend fun likeComment(mangaId: String, commentId: String, userId: String): Result<Boolean> {
+        return try {
+            val likeDocRef = firestore.collection("commentLikes")
+                .document("${userId}_$commentId")
+            
+            val commentRef = firestore.collection("manga")
+                .document(mangaId)
+                .collection("comments")
+                .document(commentId)
+            
+            val likeDoc = likeDocRef.get().await()
+            
+            if (likeDoc.exists()) {
+                // Unlike
+                likeDocRef.delete().await()
+                
+                firestore.runTransaction { transaction ->
+                    val comment = transaction.get(commentRef)
+                    val currentLikes = comment.getLong("likes") ?: 0
+                    transaction.update(commentRef, "likes", maxOf(0, currentLikes - 1))
+                }.await()
+            } else {
+                // Like
+                val likeData = hashMapOf(
+                    "userId" to userId,
+                    "commentId" to commentId,
+                    "timestamp" to System.currentTimeMillis()
+                )
+                
+                likeDocRef.set(likeData).await()
+                
+                firestore.runTransaction { transaction ->
+                    val comment = transaction.get(commentRef)
+                    val currentLikes = comment.getLong("likes") ?: 0
+                    transaction.update(commentRef, "likes", currentLikes + 1)
+                }.await()
+            }
+            
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error liking/unliking comment", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun checkIfUserLikedComment(commentId: String, userId: String): Result<Boolean> {
+        return try {
+            val likeDoc = firestore.collection("commentLikes")
+                .document("${userId}_$commentId")
+                .get()
+                .await()
+            
+            Result.success(likeDoc.exists())
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error checking if user liked comment", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getUserInfo(userId: String): Result<User> {
+        return try {
+            val document = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(userId)
+                .get()
+                .await()
+
+            if (document.exists()) {
+                val user = document.toObject(User::class.java)
+                Result.success(user!!)
+            } else {
+                Result.failure(Exception("User not found"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

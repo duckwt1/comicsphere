@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,8 @@ import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import androidx.compose.runtime.collectAsState
+import com.android.dacs3.presentations.components.CommentSection
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun MangaDetailScreen(
@@ -78,7 +81,9 @@ fun MangaDetailScreen(
 
         // Get the last read chapter
         viewModel.getLastReadChapter(mangaId, selectedLanguage)
+        viewModel.loadComments(mangaId)
     }
+
 
     // Handle error messages
     LaunchedEffect(error) {
@@ -106,77 +111,117 @@ fun MangaDetailScreen(
             )
         }
     ) { paddingValues ->
-
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
-                MangaHeader(
-                    mangaDetail = mangaDetail,
-                    selectedLanguage = selectedLanguage,
-                    availableLanguages = availableLanguages,
-                    onLanguageSelected = { viewModel.changeLanguage(it) },
-                    textColor = textColor
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        if (lastReadChapter != null) {
-                            val (chapterId, pageIndex) = lastReadChapter!!
-                            navController.navigate(Screens.ChapterScreen.createRoute(mangaId, chapterId, selectedLanguage, pageIndex))
-                        } else {
-                            // If no last read chapter, navigate to the first chapter
-                            val firstChapter = chapters.firstOrNull()
-                            if (firstChapter != null) {
-                                navController.navigate(Screens.ChapterScreen.createRoute(mangaId, firstChapter.id, selectedLanguage))
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Text(
-                        if (lastReadChapter != null) {
-                            val (chapterId, pageIndex) = lastReadChapter!!
-                            val chapter = chapters.find { it.id == chapterId }
-                            val chapterNumber = chapter?.attributes?.chapter ?: "?"
-                            "Continue Chapter $chapterNumber - Page $pageIndex"
-                        } else {
-                            "Start Reading"
-                        }
+                item {
+                    MangaHeader(
+                        mangaDetail = mangaDetail,
+                        selectedLanguage = selectedLanguage,
+                        availableLanguages = availableLanguages,
+                        onLanguageSelected = { viewModel.changeLanguage(it) },
+                        textColor = textColor
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                MangaDescription(
-                    description = mangaDetail.description,
-                    isExpanded = isDescriptionExpanded,
-                    onExpandToggle = { isDescriptionExpanded = !isDescriptionExpanded },
-                    textColor = textColor
-                )
+                item {
+                    Button(
+                        onClick = {
+                            if (lastReadChapter != null) {
+                                val (chapterId, pageIndex) = lastReadChapter!!
+                                navController.navigate(Screens.ChapterScreen.createRoute(mangaId, chapterId, selectedLanguage, pageIndex))
+                            } else {
+                                // If no last read chapter, navigate to the first chapter
+                                val firstChapter = chapters.firstOrNull()
+                                if (firstChapter != null) {
+                                    navController.navigate(Screens.ChapterScreen.createRoute(mangaId, firstChapter.id, selectedLanguage))
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            if (lastReadChapter != null) {
+                                val (chapterId, pageIndex) = lastReadChapter!!
+                                val chapter = chapters.find { it.id == chapterId }
+                                val chapterNumber = chapter?.attributes?.chapter ?: "?"
+                                "Continue Chapter $chapterNumber - Page $pageIndex"
+                            } else {
+                                "Start Reading"
+                            }
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                MangaTags(tags = mangaDetail.genres, textColor = textColor)
+                item {
+                    MangaDescription(
+                        description = mangaDetail.description,
+                        isExpanded = isDescriptionExpanded,
+                        onExpandToggle = { isDescriptionExpanded = !isDescriptionExpanded },
+                        textColor = textColor
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                MangaChapters(
-                    chapters = chapters,
-                    mangaId = mangaId,
-                    textColor = textColor,
-                    navController = navController,
-                    viewModel = viewModel
-                )
+                item {
+                    MangaTags(tags = mangaDetail.genres, textColor = textColor)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                item {
+                    Divider()
+                }
+
+                item {
+                    // Collect comment states
+                    val comments by viewModel.comments.collectAsState()
+                    val isLoadingComments by viewModel.isLoadingComments.collectAsState()
+                    val commentActionInProgress by viewModel.commentActionInProgress.collectAsState()
+                    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
+                    // Comment section
+                    CommentSection(
+                        comments = comments,
+                        currentUserId = currentUserId,
+                        isLoading = isLoadingComments || commentActionInProgress,
+                        onAddComment = { content -> viewModel.addComment(mangaId, content) },
+                        onDeleteComment = { commentId -> viewModel.deleteComment(commentId) }
+                    )
+                }
+
+                item {
+                    Divider()
+                }
+
+                item {
+                    MangaChapters(
+                        chapters = chapters,
+                        mangaId = mangaId,
+                        textColor = textColor,
+                        navController = navController
+                    )
+                }
             }
 
             // Show loading indicator when operation is in progress
@@ -374,8 +419,7 @@ fun MangaChapters(
     chapters: List<ChapterData>,
     mangaId: String,
     textColor: Color,
-    navController: NavHostController,
-    viewModel: MangaViewModel
+    navController: NavHostController
 ) {
     val context = LocalContext.current
 
@@ -400,7 +444,7 @@ fun MangaChapters(
             Text(
                 text = "Chapters:",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = 16.sp,
                 color = textColor
             )
 
@@ -486,4 +530,11 @@ fun MangaChapters(
         }
     }
 }
+
+
+
+
+
+
+
 

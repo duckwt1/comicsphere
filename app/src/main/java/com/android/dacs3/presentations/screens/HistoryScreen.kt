@@ -102,10 +102,14 @@ fun HistoryScreen(
 
     // Cập nhật trạng thái loading dựa trên việc tải dữ liệu
     LaunchedEffect(readingProgress, mangaDetails, chapterDetails) {
-        val hasData = readingProgress.isNotEmpty() &&
-                mangaDetails.isNotEmpty() &&
-                chapterDetails.isNotEmpty()
-        isLoading = !hasData && !isDeleting
+        // Nếu đang trong quá trình xóa, không cập nhật trạng thái loading
+        if (isDeleting) return@LaunchedEffect
+        
+        // Nếu có lỗi, không cập nhật trạng thái loading
+        if (error != null) return@LaunchedEffect
+        
+        // Nếu đã load xong dữ liệu (có thể là empty list) thì tắt loading
+        isLoading = false
     }
 
     // Dialog xác nhận xoá tất cả lịch sử
@@ -228,7 +232,7 @@ fun HistoryScreen(
                     ErrorDisplay(errorMessage = error!!)
                 }
                 latestProgressByManga.isEmpty() -> {
-                    EmptyHistoryDisplay()
+                    EmptyHistoryDisplay(navController)
                 }
                 else -> {
                     LazyColumn(
@@ -384,7 +388,8 @@ fun HistoryItem(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
+//                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -481,7 +486,7 @@ fun ErrorDisplay(errorMessage: String) {
 }
 
 @Composable
-fun EmptyHistoryDisplay() {
+fun EmptyHistoryDisplay(navController: NavController) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -491,26 +496,35 @@ fun EmptyHistoryDisplay() {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(32.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Home,
-                contentDescription = "Empty History",
-                tint = Color.Gray,
-                modifier = Modifier.size(72.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "No reading history yet",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = Color(0xFF333333)
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Start reading manga and your history will appear here",
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.Gray,
+                color = Color(0xFF666666),
                 textAlign = TextAlign.Center
             )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { navController.navigate(Screens.ExploreScreen.route) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF333333)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = "Browse Manga",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White
+                )
+            }
         }
     }
 }
