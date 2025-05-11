@@ -105,7 +105,7 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-firestore-ktx")
-
+    implementation ("com.google.android.gms:play-services-auth:20.7.0")
 
     // Fragment
     implementation("androidx.fragment:fragment-ktx:1.4.0")

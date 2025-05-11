@@ -11,12 +11,18 @@ import com.android.dacs3.data.model.User
 import com.android.dacs3.data.repository.AuthRepository
 import com.android.dacs3.data.repository.CloudinaryRepository
 import com.android.dacs3.utliz.SessionManager
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import android.content.Context
+import com.android.dacs3.R
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -165,13 +171,33 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun logout() {
+    fun logout(context: Context) {
         viewModelScope.launch {
-            FirebaseAuth.getInstance().signOut()
-            sessionManager.saveLoginState(false)
-            loginState = "Logged out"
-            isLoginSuccessful = false
-            currentUser = null
+            try {
+                // Đăng xuất khỏi Firebase
+                FirebaseAuth.getInstance().signOut()
+                
+                // Đăng xuất và thu hồi quyền truy cập của Google Sign-In
+                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(context.getString(R.string.default_web_client_id))
+                    .requestEmail()
+                    .build()
+                val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                
+                // Sử dụng revokeAccess() thay vì signOut()
+                googleSignInClient.revokeAccess().await()
+                
+                // Cập nhật trạng thái
+                sessionManager.saveLoginState(false)
+                loginState = "Logged out"
+                isLoginSuccessful = false
+                currentUser = null
+                
+                Log.d("AuthViewModel", "Logged out and revoked access successfully")
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Error during logout", e)
+                loginState = "Error during logout: ${e.message}"
+            }
         }
     }
 
@@ -244,6 +270,34 @@ class AuthViewModel @Inject constructor(
             } catch (e: Exception) {
                 updateProfileState = e.message ?: "Failed to update profile"
                 isProfileUpdateSuccessful = false
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun signInWithGoogle(account: GoogleSignInAccount) {
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                Log.d("AuthViewModel", "Starting Google sign-in with token: ${account.idToken?.take(10)}...")
+                authRepository.signInWithGoogle(account.idToken ?: "")
+                    .onSuccess { user ->
+                        currentUser = user
+                        loginState = "Login successful"
+                        isLoginSuccessful = true
+                        sessionManager.saveLoginState(true)
+                        Log.d("AuthViewModel", "Google sign-in successful, user: ${user.email}")
+                    }
+                    .onFailure { e ->
+                        loginState = e.message ?: "Google sign-in failed"
+                        isLoginSuccessful = false
+                        Log.e("AuthViewModel", "Google sign-in failed", e)
+                    }
+            } catch (e: Exception) {
+                loginState = e.message ?: "Google sign-in failed"
+                isLoginSuccessful = false
+                Log.e("AuthViewModel", "Exception during Google sign-in", e)
             } finally {
                 isLoading = false
             }

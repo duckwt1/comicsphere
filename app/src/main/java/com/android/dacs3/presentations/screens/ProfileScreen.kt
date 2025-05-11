@@ -155,12 +155,8 @@ private fun ProfileContent(
 
         // Logout button
         LogoutButton(
-            onClick = {
-                viewModel.logout()
-                navController.navigate(Screens.LoginScreen.route) {
-                    popUpTo(Screens.SplashScreen.route) { inclusive = true }
-                }
-            }
+            viewModel = viewModel,
+            navController = navController
         )
     }
 }
@@ -494,9 +490,16 @@ private fun ProfileInfoItem(
 }
 
 @Composable
-private fun LogoutButton(onClick: () -> Unit) {
+private fun LogoutButton(viewModel: AuthViewModel, navController: NavController) {
+    val context = LocalContext.current
+    
     Button(
-        onClick = onClick,
+        onClick = {
+            viewModel.logout(context)
+            navController.navigate(Screens.LoginScreen.route) {
+                popUpTo(Screens.SplashScreen.route) { inclusive = true }
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .height(54.dp),

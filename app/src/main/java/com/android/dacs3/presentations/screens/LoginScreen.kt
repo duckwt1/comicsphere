@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.presentations.components.GoogleSignInButton
 import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
@@ -74,6 +75,9 @@ private val BlackWhiteThemeColors = object {
 
 @Composable
 fun LoginScreen(navController: NavController) {
+
+    val viewModel: AuthViewModel = hiltViewModel()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -123,7 +127,7 @@ fun LoginScreen(navController: NavController) {
             )
 
             Spacer(modifier = Modifier.height(24.dp))
-            GoogleSignInButton()
+            GoogleSignInButton(viewModel)
 
             Spacer(modifier = Modifier.height(12.dp))
             Row {
@@ -143,22 +147,20 @@ fun LoginScreen(navController: NavController) {
             }
         }
 
-        LoginForm(navController = navController)
+        LoginForm(navController = navController, viewModel = viewModel)
     }
 }
 
 @Composable
-fun LoginForm(navController: NavController) {
+fun LoginForm(navController: NavController, viewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val viewModel: AuthViewModel = hiltViewModel()
-
     val context = LocalContext.current
 
-    LaunchedEffect(viewModel.loginState) {
+    LaunchedEffect(viewModel.loginState, viewModel.isLoginSuccessful) {
         if (viewModel.loginState.isNotEmpty()) {
             Toast.makeText(context, viewModel.loginState, Toast.LENGTH_SHORT).show()
         }
@@ -239,29 +241,6 @@ fun LoginForm(navController: NavController) {
     }
 }
 
-@Composable
-fun GoogleSignInButton() {
-    OutlinedButton(
-        onClick = { },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, BlackWhiteThemeColors.BorderColor),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = BlackWhiteThemeColors.TextPrimary
-        )
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_google_logo),
-            contentDescription = "Google",
-            modifier = Modifier.size(20.dp),
-            tint = Color.Unspecified // Giữ logo Google với màu gốc
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Continue with Google", color = BlackWhiteThemeColors.TextPrimary)
-    }
-}
 
 @Preview(showSystemUi = true, showBackground = true)
 @Composable

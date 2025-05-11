@@ -13,4 +13,5 @@ interface AuthRepository {
     ): Result<Boolean>
     suspend fun getUserInfo(userId: String): Result<User>
     suspend fun sendPasswordResetEmail(email: String): Result<Boolean>
+    suspend fun signInWithGoogle(idToken: String): Result<User>
 }

@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.presentations.components.GoogleSignInButton
 import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
@@ -58,7 +59,7 @@ fun SignUpScreen(navController: NavController) {
     val viewModel: AuthViewModel = hiltViewModel()
     val context = LocalContext.current
 
-    LaunchedEffect(viewModel.loginState) {
+    LaunchedEffect(viewModel.loginState, viewModel.isLoginSuccessful) {
         if (viewModel.loginState.isNotEmpty()) {
             Toast.makeText(context, viewModel.loginState, Toast.LENGTH_SHORT).show()
         }
@@ -99,7 +100,7 @@ fun SignUpScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        GoogleSignInButton()
+        GoogleSignInButton(viewModel = viewModel)
 
         Spacer(modifier = Modifier.height(20.dp))
 
