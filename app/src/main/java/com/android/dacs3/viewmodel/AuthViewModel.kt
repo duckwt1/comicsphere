@@ -177,15 +177,15 @@ class AuthViewModel @Inject constructor(
                 // Đăng xuất khỏi Firebase
                 FirebaseAuth.getInstance().signOut()
                 
-                // Đăng xuất và thu hồi quyền truy cập của Google Sign-In
+                // Đăng xuất khỏi Google Sign-In
                 val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                     .requestIdToken(context.getString(R.string.default_web_client_id))
                     .requestEmail()
                     .build()
                 val googleSignInClient = GoogleSignIn.getClient(context, gso)
                 
-                // Sử dụng revokeAccess() thay vì signOut()
-                googleSignInClient.revokeAccess().await()
+                // Đăng xuất khỏi Google
+                googleSignInClient.signOut().await()
                 
                 // Cập nhật trạng thái
                 sessionManager.saveLoginState(false)
@@ -193,7 +193,7 @@ class AuthViewModel @Inject constructor(
                 isLoginSuccessful = false
                 currentUser = null
                 
-                Log.d("AuthViewModel", "Logged out and revoked access successfully")
+                Log.d("AuthViewModel", "Logged out successfully")
             } catch (e: Exception) {
                 Log.e("AuthViewModel", "Error during logout", e)
                 loginState = "Error during logout: ${e.message}"

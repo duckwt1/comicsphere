@@ -7,7 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +20,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import android.util.Log
 import android.widget.Toast
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun GoogleSignInButton(viewModel: AuthViewModel) {
@@ -32,9 +33,17 @@ fun GoogleSignInButton(viewModel: AuthViewModel) {
         .build()
     
     val googleSignInClient = GoogleSignIn.getClient(context, gso)
-
-    googleSignInClient.signOut() // Đăng xuất nếu đã đăng nhập trước đó
-
+    
+    // Đảm bảo đăng xuất khỏi Google trước khi hiển thị màn hình đăng nhập
+    LaunchedEffect(Unit) {
+        try {
+            googleSignInClient.signOut().await()
+            Log.d("GoogleSignIn", "Signed out from Google before showing sign-in button")
+        } catch (e: Exception) {
+            Log.e("GoogleSignIn", "Error signing out from Google", e)
+        }
+    }
+    
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -90,5 +99,6 @@ fun GoogleSignInButton(viewModel: AuthViewModel) {
         Text("Continue with Google", color = Color.Black)
     }
 }
+
 
 
