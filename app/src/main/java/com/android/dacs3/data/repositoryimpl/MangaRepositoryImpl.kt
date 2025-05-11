@@ -516,4 +516,29 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getReadChapters(
+        userId: String,
+        mangaId: String,
+        language: String
+    ): Result<List<String>> {
+        return try {
+            val querySnapshot = firestore.collection("users")
+                .document(userId)
+                .collection("readingProgress")
+                .whereEqualTo("mangaId", mangaId)
+                .whereEqualTo("language", language)
+                .get()
+                .await()
+
+            val readChapterIds = querySnapshot.documents.mapNotNull { doc ->
+                doc.getString("chapterId")
+            }
+
+            Result.success(readChapterIds)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error getting read chapters", e)
+            Result.failure(e)
+        }
+    }
+
 }

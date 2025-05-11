@@ -82,4 +82,10 @@ interface MangaRepository {
     suspend fun checkIfUserLikedComment(commentId: String, userId: String): Result<Boolean>
 
     suspend fun getUserInfo(userId: String): Result<User>
+
+    suspend fun getReadChapters(
+        userId: String,
+        mangaId: String,
+        language: String
+    ): Result<List<String>>
 }

@@ -65,6 +65,7 @@ fun MangaDetailScreen(
     val chapters by viewModel.chapters.collectAsState()
     val loading by favViewModel.loading.observeAsState(false)
     val error by favViewModel.error.observeAsState()
+    val readChapters by viewModel.readChapters.collectAsState()
 
     // Màu sắc trong theme đen trắng
     val backgroundColor = Color.White
@@ -90,6 +91,7 @@ fun MangaDetailScreen(
         systemUiController.setSystemBarsColor(backgroundColor, darkIcons = true)
         viewModel.loadMangaDetails(mangaId)
         viewModel.loadChapters(mangaId, selectedLanguage)
+        viewModel.loadReadChapters(mangaId, selectedLanguage)
 
         favViewModel.loadFavourites()
         favViewModel.checkIfFavourite(mangaId)
@@ -125,7 +127,8 @@ fun MangaDetailScreen(
                 textColor = textColor,
                 navController = navController,
                 backgroundColor = backgroundColor,
-                dividerColor = dividerColor
+                dividerColor = dividerColor,
+                readChapters = readChapters
             )
         },
         sheetPeekHeight = 64.dp, // Hiển thị một phần của BottomSheet
@@ -479,7 +482,8 @@ fun ChaptersBottomSheet(
     textColor: Color,
     navController: NavHostController,
     backgroundColor: Color,
-    dividerColor: Color
+    dividerColor: Color,
+    readChapters: Set<String> = emptySet()
 ) {
     val context = LocalContext.current
     val sortedChapters = chapters.sortedByDescending { it.attributes.chapter?.toFloatOrNull() ?: 0f }
@@ -523,6 +527,7 @@ fun ChaptersBottomSheet(
                     chapter = chapter,
                     textColor = textColor,
                     dividerColor = dividerColor,
+                    isRead = chapter.id in readChapters,
                     onClick = {
                         val externalUrl = chapter.attributes.externalUrl
                         if (externalUrl != null) {
@@ -547,6 +552,7 @@ fun ChapterItem(
     chapter: ChapterData,
     textColor: Color,
     dividerColor: Color,
+    isRead: Boolean = false,
     onClick: () -> Unit
 ) {
     Column(
@@ -558,15 +564,14 @@ fun ChapterItem(
         Text(
             text = "Chapter ${chapter.attributes.chapter ?: "?"}",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = textColor
+            color = if (isRead) textColor.copy(alpha = 0.5f) else textColor
         )
 
         if (!chapter.attributes.title.isNullOrEmpty()) {
             Text(
                 text = chapter.attributes.title,
                 style = MaterialTheme.typography.bodyMedium,
-                color = textColor.copy(alpha = 0.7f),
+                color = if (isRead) textColor.copy(alpha = 0.4f) else textColor.copy(alpha = 0.7f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -578,3 +583,4 @@ fun ChapterItem(
         )
     }
 }
+

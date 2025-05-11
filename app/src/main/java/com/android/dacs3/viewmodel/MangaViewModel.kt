@@ -107,6 +107,10 @@ class MangaViewModel @Inject constructor(
     private val _userLikes = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val userLikes: StateFlow<Map<String, Boolean>> = _userLikes.asStateFlow()
 
+    // Add a new state to track read chapters
+    private val _readChapters = MutableStateFlow<Set<String>>(emptySet())
+    val readChapters: StateFlow<Set<String>> = _readChapters.asStateFlow()
+
     init {
         fetchMangaList()
     }
@@ -877,7 +881,23 @@ class MangaViewModel @Inject constructor(
         }
         return isLoggedIn
     }
+
+    // Add a function to load read chapters for a manga
+    fun loadReadChapters(mangaId: String, language: String) {
+        val userId = firebaseAuth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            try {
+                val result = repository.getReadChapters(userId, mangaId, language)
+                result.onSuccess { chapters ->
+                    _readChapters.value = chapters.toSet()
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error loading read chapters", e)
+            }
+        }
+    }
 }
+
 
 
 
