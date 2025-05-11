@@ -24,6 +24,10 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screens.SplashScreen.route) { SplashScreen(navController) }
         composable(Screens.LoginScreen.route) { LoginScreen(navController) }
 
+        composable(route = Screens.ForgotPasswordScreen.route) {
+            ForgotPasswordScreen(navController = navController)
+        }
+
         composable(Screens.HistoryScreen.route) {
             val viewModel: MangaViewModel = hiltViewModel()
             HistoryScreen(navController = navController, viewModel = viewModel)

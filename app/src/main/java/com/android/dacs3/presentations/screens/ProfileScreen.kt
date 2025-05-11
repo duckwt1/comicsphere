@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
@@ -20,8 +22,7 @@ import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
+import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
@@ -147,7 +149,7 @@ private fun ProfileContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         // Profile information card
-        ProfileInfoCard(viewModel = viewModel)
+        ProfileInfoCard(viewModel = viewModel, navController = navController)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -179,7 +181,7 @@ private fun ProfileAvatar(
             modifier = Modifier
                 .size(120.dp)
                 .shadow(4.dp, CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                .border(2.dp, Color.Gray, CircleShape)
                 .clip(CircleShape)
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
@@ -229,7 +231,7 @@ private fun ProfileAvatar(
                     .size(30.dp)
                     .align(Alignment.BottomEnd)
                     .offset(x = 4.dp, y = 4.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
+                containerColor = Color.LightGray,
                 contentColor = Color.White,
                 elevation = FloatingActionButtonDefaults.elevation(
                     defaultElevation = 6.dp,
@@ -248,7 +250,29 @@ private fun ProfileAvatar(
 }
 
 @Composable
-private fun ProfileInfoCard(viewModel: AuthViewModel) {
+private fun ProfileInfoCard(viewModel: AuthViewModel, navController: NavController) {
+    var isEditing by remember { mutableStateOf(false) }
+    var fullname by remember { mutableStateOf(viewModel.currentUser?.fullname ?: "") }
+    var nickname by remember { mutableStateOf(viewModel.currentUser?.nickname ?: "") }
+    var showError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    
+    // Update local state when user data changes
+    LaunchedEffect(viewModel.currentUser) {
+        viewModel.currentUser?.let {
+            fullname = it.fullname
+            nickname = it.nickname
+        }
+    }
+    
+    // Handle profile update success
+    LaunchedEffect(viewModel.updateProfileState) {
+        if (viewModel.isProfileUpdateSuccessful) {
+            isEditing = false
+            isLoading = false
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -265,44 +289,161 @@ private fun ProfileInfoCard(viewModel: AuthViewModel) {
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            Text(
-                text = "Personal Information",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color.Black
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Personal Information",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color.Black
+                )
+                
+                if (isEditing) {
+                    Row {
+                        IconButton(
+                            onClick = {
+                                isEditing = false
+                                fullname = viewModel.currentUser?.fullname ?: ""
+                                nickname = viewModel.currentUser?.nickname ?: ""
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                tint = Color.Gray
+                            )
+                        }
+                        
+                        IconButton(
+                            onClick = {
+                                showError = fullname.isBlank() || nickname.isBlank()
+                                if (!showError) {
+                                    viewModel.updateUserProfile(fullname, nickname)
+                                    isLoading = true
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Done,
+                                contentDescription = "Save",
+                                tint = Color.Black
+                            )
+                        }
+                    }
+                } else {
+                    IconButton(
+                        onClick = { isEditing = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile",
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            ProfileInfoItem(
-                icon = Icons.Rounded.Person,
-                label = "Full Name",
-                value = viewModel.currentUser?.fullname ?: "N/A"
-            )
+            if (isEditing) {
+                // Editable fields
+                Column {
+                    StyledTextField(
+                        value = fullname,
+                        onValueChange = { 
+                            fullname = it
+                            showError = false
+                        },
+                        label = "Full Name",
+                        hasError = showError && fullname.isBlank()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    StyledTextField(
+                        value = nickname,
+                        onValueChange = { 
+                            nickname = it
+                            showError = false
+                        },
+                        label = "Nickname",
+                        hasError = showError && nickname.isBlank()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    StyledTextField(
+                        value = viewModel.currentUser?.email ?: "",
+                        onValueChange = { },
+                        label = "Email",
+                        isPassword = false,
+                        hasError = false
+                    )
+                    
+                    if (showError) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Please fill in all required fields",
+                            color = Color.Red,
+                            fontSize = 14.sp
+                        )
+                    }
+                    
+                    if (viewModel.updateProfileState.isNotEmpty() && !viewModel.isProfileUpdateSuccessful) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = viewModel.updateProfileState,
+                            color = Color.Red,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            } else {
+                // Read-only display
+                ProfileInfoItem(
+                    icon = Icons.Rounded.Person,
+                    label = "Full Name",
+                    value = viewModel.currentUser?.fullname ?: "N/A"
+                )
 
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = Color.LightGray.copy(alpha = 0.5f),
-                thickness = 1.dp
-            )
+                Divider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = Color.LightGray.copy(alpha = 0.5f),
+                    thickness = 1.dp
+                )
 
-            ProfileInfoItem(
-                icon = Icons.Rounded.Face,
-                label = "Nickname",
-                value = viewModel.currentUser?.nickname ?: "N/A"
-            )
+                ProfileInfoItem(
+                    icon = Icons.Rounded.Face,
+                    label = "Nickname",
+                    value = viewModel.currentUser?.nickname ?: "N/A"
+                )
 
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = Color.LightGray.copy(alpha = 0.5f),
-                thickness = 1.dp
-            )
+                Divider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = Color.LightGray.copy(alpha = 0.5f),
+                    thickness = 1.dp
+                )
 
-            ProfileInfoItem(
-                icon = Icons.Rounded.Email,
-                label = "Email",
-                value = viewModel.currentUser?.email ?: "N/A"
-            )
+                ProfileInfoItem(
+                    icon = Icons.Rounded.Email,
+                    label = "Email",
+                    value = viewModel.currentUser?.email ?: "N/A"
+                )
+            }
+        }
+    }
+    
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
     }
 }

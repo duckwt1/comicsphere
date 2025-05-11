@@ -3,6 +3,7 @@ package com.android.dacs3.presentations.screens
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,8 +53,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
+
+// Định nghĩa màu sắc cho chủ đề trắng đen
+private val BlackWhiteThemeColors = object {
+    val Background = Color.White
+    val BackgroundGradientEnd = Color(0xFFE0E0E0) // Xám nhạt thay vì xanh nhạt
+    val TextPrimary = Color.Black
+    val TextSecondary = Color(0xFF505050) // Xám đậm
+    val Accent = Color.Black
+    val FormBackground = Color(0xFFF0F0F0) // Xám rất nhạt
+    val ButtonBackground = Color.Black
+    val ButtonText = Color.White
+    val BorderColor = Color(0xFFCCCCCC) // Xám nhạt cho viền
+    val LinkColor = Color.Black
+}
+
 
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -61,27 +79,62 @@ fun LoginScreen(navController: NavController) {
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color.White, Color(0xFFE0E0FF))
+                    colors = listOf(
+                        BlackWhiteThemeColors.Background,
+                        BlackWhiteThemeColors.BackgroundGradientEnd
+                    )
                 )
             )
             .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Spacer(modifier = Modifier.height(20.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Welcome", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            Text("Sign in to start", color = Color.Gray, fontSize = 16.sp)
+            // Thêm Logo ứng dụng
+            Box(
+                modifier = Modifier
+                    .padding(top = 40.dp, bottom = 20.dp)
+                    .size(120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+//                Icon(
+//                    painter = painterResource(id = R.drawable.logo),
+//                    contentDescription = "App Logo",
+//                    modifier = Modifier.size(100.dp),
+//                    tint = Color.Unspecified
+//                )
+
+                 Image(
+                     painter = painterResource(id = R.drawable.logo),
+                     contentDescription = "App Logo",
+                     modifier = Modifier.size(100.dp)
+                 )
+            }
+
+            Text(
+                "Welcome",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = BlackWhiteThemeColors.TextPrimary
+            )
+            Text(
+                "Sign in to start",
+                color = BlackWhiteThemeColors.TextSecondary,
+                fontSize = 16.sp
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
             GoogleSignInButton()
 
             Spacer(modifier = Modifier.height(12.dp))
             Row {
-                Text("Haven't account?", color = Color.Gray)
+                Text(
+                    "Haven't account?",
+                    color = BlackWhiteThemeColors.TextSecondary
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     "Sign up!",
-                    color = Color.Blue,
+                    color = BlackWhiteThemeColors.LinkColor,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable {
                         navController.navigate(Screens.SignUpScreen.route)
@@ -111,20 +164,19 @@ fun LoginForm(navController: NavController) {
         }
 
         if (viewModel.isLoginSuccessful) {
-            navController.navigate(Screens.HistoryScreen.route) { // Ensure this matches the navigation graph
+            navController.navigate(Screens.HistoryScreen.route) {
                 popUpTo(Screens.LoginScreen.route) { inclusive = true }
             }
         }
     }
 
-    val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFE0C3FC), Color(0xFF8EC5FC))
-    )
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(gradient, shape = RoundedCornerShape(20.dp))
+            .background(
+                color = BlackWhiteThemeColors.FormBackground,
+                shape = RoundedCornerShape(20.dp)
+            )
             .padding(20.dp)
     ) {
         Column {
@@ -151,17 +203,17 @@ fun LoginForm(navController: NavController) {
                 hasError = showError && password.isBlank()
             )
 
-
             Spacer(modifier = Modifier.height(4.dp))
 
-            Text(
-                "Forgot password?",
-                color = Color.DarkGray,
-                fontSize = 12.sp,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .clickable { /* TODO: Forgot password */ }
-            )
+            TextButton(
+                onClick = { navController.navigate(Screens.ForgotPasswordScreen.route) },
+                modifier = Modifier.align(Alignment.End),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = BlackWhiteThemeColors.LinkColor
+                )
+            ) {
+                Text("Forgot Password?")
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -177,14 +229,15 @@ fun LoginForm(navController: NavController) {
                     .fillMaxWidth()
                     .height(48.dp),
                 shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BlackWhiteThemeColors.ButtonBackground
+                )
             ) {
-                Text("Continue", color = Color.White)
+                Text("Continue", color = BlackWhiteThemeColors.ButtonText)
             }
         }
     }
 }
-
 
 @Composable
 fun GoogleSignInButton() {
@@ -194,19 +247,21 @@ fun GoogleSignInButton() {
             .fillMaxWidth()
             .height(48.dp),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Color.LightGray)
+        border = BorderStroke(1.dp, BlackWhiteThemeColors.BorderColor),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = BlackWhiteThemeColors.TextPrimary
+        )
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_google_logo),
             contentDescription = "Google",
             modifier = Modifier.size(20.dp),
-            tint = Color.Unspecified
+            tint = Color.Unspecified // Giữ logo Google với màu gốc
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text("Continue with Google", color = Color.Black)
+        Text("Continue with Google", color = BlackWhiteThemeColors.TextPrimary)
     }
 }
-
 
 @Preview(showSystemUi = true, showBackground = true)
 @Composable

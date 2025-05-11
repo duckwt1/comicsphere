@@ -1,3 +1,15 @@
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    load(rootProject.file("local.properties").inputStream())
+}
+
+val cloudinaryCloudName = localProperties["cloudinary_name"] as String
+val cloudinaryApiKey = localProperties["cloudinary_api_key"] as String
+val cloudinaryApiSecret = localProperties["cloudinary_api_secret"] as String
+val mailUsername = localProperties["mail_username"] as String
+val mailPassword = localProperties["mail_password"] as String
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,6 +32,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "CloudinaryCloudName", "\"$cloudinaryCloudName\"")
+        buildConfigField("String", "CloudinaryApiKey", "\"$cloudinaryApiKey\"")
+        buildConfigField("String", "CloudinaryApiSecret", "\"$cloudinaryApiSecret\"")
+        buildConfigField("String", "MailUsername", "\"$mailUsername\"")
+        buildConfigField("String", "MailPassword", "\"$mailPassword\"")
     }
 
     buildTypes {
@@ -28,6 +46,16 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
+            )
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE.md",
+                "META-INF/LICENSE",
+                "META-INF/NOTICE.md"
             )
         }
     }
@@ -43,6 +71,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -104,7 +133,11 @@ dependencies {
     implementation ("com.google.android.gms:play-services-base:18.2.0")
 
     // Cloudinary
-    implementation ("com.cloudinary:cloudinary-android:2.3.1") // hoặc phiên bản mới nhất
+    implementation ("com.cloudinary:cloudinary-android:2.3.1")
+
+    // Android Mail
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
 
 
 }

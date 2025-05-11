@@ -25,8 +25,24 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.android.dacs3.R
+import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
+
+// Định nghĩa màu sắc cho chủ đề trắng đen
+private val BlackWhiteThemeColors = object {
+    val Background = Color.White
+    val BackgroundGradientEnd = Color(0xFFE0E0E0) // Xám nhạt
+    val TextPrimary = Color.Black
+    val TextSecondary = Color(0xFF505050) // Xám đậm
+    val Accent = Color.Black
+    val FormBackground = Color(0xFFF0F0F0) // Xám rất nhạt
+    val ButtonBackground = Color.Black
+    val ButtonText = Color.White
+    val BorderColor = Color(0xFFCCCCCC) // Xám nhạt cho viền
+    val LinkColor = Color.Black
+    val ErrorColor = Color(0xFF990000) // Đỏ đậm cho thông báo lỗi
+}
 
 @Composable
 fun SignUpScreen(navController: NavController) {
@@ -57,17 +73,33 @@ fun SignUpScreen(navController: NavController) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        BlackWhiteThemeColors.Background,
+                        BlackWhiteThemeColors.BackgroundGradientEnd
+                    )
+                )
+            )
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(40.dp))
-        Text("Welcome", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-        Text("Sign up to start", fontSize = 16.sp, color = Color.Gray)
+        Text(
+            "Welcome",
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            color = BlackWhiteThemeColors.TextPrimary
+        )
+        Text(
+            "Sign up to start",
+            fontSize = 16.sp,
+            color = BlackWhiteThemeColors.TextSecondary
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        googleSignInButton()
+        GoogleSignInButton()
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -75,14 +107,14 @@ fun SignUpScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFFE0C3FC), Color(0xFF8EC5FC))
-                    ),
+                    color = BlackWhiteThemeColors.FormBackground,
                     shape = RoundedCornerShape(20.dp)
                 )
                 .padding(20.dp)
         ) {
             Column {
+                // Sử dụng CustomStyledTextField nếu không có StyledTextField từ component
+                // hoặc thay CustomStyledTextField bằng StyledTextField nếu component này đã được định nghĩa
                 StyledTextField(
                     value = email,
                     onValueChange = {
@@ -142,7 +174,11 @@ fun SignUpScreen(navController: NavController) {
                 )
 
                 if (passwordMismatch) {
-                    Text("Passwords do not match", color = Color.Red, fontSize = 12.sp)
+                    Text(
+                        "Passwords do not match",
+                        color = BlackWhiteThemeColors.ErrorColor,
+                        fontSize = 12.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -166,92 +202,55 @@ fun SignUpScreen(navController: NavController) {
                         .fillMaxWidth()
                         .height(48.dp),
                     shape = RoundedCornerShape(30),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BlackWhiteThemeColors.ButtonBackground
+                    )
                 ) {
-                    Text("Continue", color = Color.White)
+                    Text("Continue", color = BlackWhiteThemeColors.ButtonText)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
-                // Have account? Login
+
                 TextButton(
                     onClick = { navController.navigate(Screens.LoginScreen.route) },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = BlackWhiteThemeColors.TextSecondary
+                    )
                 ) {
-                    Text("Have an account? Login", color = Color.Gray)
+                    Text("Have an account? Login")
                 }
             }
         }
     }
 }
 
-
-@Composable
-fun StyledTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    isPassword: Boolean = false,
-    hasError: Boolean = false
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = {
-            Text(
-                label,
-                fontWeight = FontWeight.Normal,
-                color = if (hasError) Color.Red else Color.DarkGray
-            )
-        },
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = LocalTextStyle.current.copy(
-            fontWeight = FontWeight.Normal,
-            color = Color.Black
-        ),
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = if (isPassword) KeyboardOptions(keyboardType = KeyboardType.Password) else KeyboardOptions.Default,
-        isError = hasError,
-        colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = Color(0x40FFFFFF),
-            focusedContainerColor = Color(0x55FFFFFF),
-            unfocusedTextColor = Color.Black,
-            focusedTextColor = Color.Black,
-            errorTextColor = Color.Red,
-            focusedBorderColor = if (hasError) Color.Red else MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = if (hasError) Color.Red else Color.Gray,
-            errorBorderColor = Color.Red,
-        )
-    )
-}
-
-
-
-@Composable
-fun googleSignInButton() {
-    OutlinedButton(
-        onClick = { /* Google login */ },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Color.LightGray)
-    ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_google_logo),
-            contentDescription = "Google",
-            modifier = Modifier.size(20.dp),
-            tint = Color.Unspecified
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text("Continue with Google", color = Color.Black)
-    }
-}
-
+//@Composable
+//fun GoogleSignInButton() {
+//    OutlinedButton(
+//        onClick = { /* Google login */ },
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .height(48.dp),
+//        shape = RoundedCornerShape(24.dp),
+//        border = BorderStroke(1.dp, BlackWhiteThemeColors.BorderColor),
+//        colors = ButtonDefaults.outlinedButtonColors(
+//            contentColor = BlackWhiteThemeColors.TextPrimary
+//        )
+//    ) {
+//        Icon(
+//            painter = painterResource(id = R.drawable.ic_google_logo),
+//            contentDescription = "Google",
+//            modifier = Modifier.size(20.dp),
+//            tint = Color.Unspecified // Giữ logo Google với màu gốc
+//        )
+//        Spacer(modifier = Modifier.width(8.dp))
+//        Text("Continue with Google", color = BlackWhiteThemeColors.TextPrimary)
+//    }
+//}
 
 @Preview(showSystemUi = true, showBackground = true)
 @Composable
-fun PreviewSignUpScreen() {
-    // Dùng Navigation giả để preview
+fun SignUpScreenPreview() {
     SignUpScreen(navController = rememberNavController())
 }

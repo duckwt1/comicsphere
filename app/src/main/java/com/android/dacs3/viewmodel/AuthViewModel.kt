@@ -9,7 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.dacs3.data.model.User
 import com.android.dacs3.data.repository.AuthRepository
-import com.android.dacs3.data.service.CloudinaryService
+import com.android.dacs3.data.repository.CloudinaryRepository
 import com.android.dacs3.utliz.SessionManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -22,7 +22,7 @@ import javax.inject.Inject
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val sessionManager: SessionManager,
-    private val cloudinaryService: CloudinaryService
+    private val cloudinaryRepository: CloudinaryRepository
 ) : ViewModel() {
 
     var loginState by mutableStateOf("")
@@ -38,6 +38,18 @@ class AuthViewModel @Inject constructor(
         private set
 
     var isUpdatingAvatar by mutableStateOf(false)
+        private set
+
+    var resetPasswordState by mutableStateOf("")
+        private set
+
+    var isResetEmailSent by mutableStateOf(false)
+        private set
+
+    var updateProfileState by mutableStateOf("")
+        private set
+
+    var isProfileUpdateSuccessful by mutableStateOf(false)
         private set
 
     init {
@@ -78,23 +90,27 @@ class AuthViewModel @Inject constructor(
             isUpdatingAvatar = true
             try {
                 // Upload image to Cloudinary
-                val imageUrl = cloudinaryService.uploadImage(imageUri)
+                cloudinaryRepository.uploadImage(imageUri)
+                    .onSuccess { imageUrl ->
+                        // Update user document in Firestore
+                        FirebaseFirestore.getInstance()
+                            .collection("users")
+                            .document(firebaseUser.uid)
+                            .update("avatar", imageUrl)
+                            .await()
 
-                // Update user document in Firestore
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(firebaseUser.uid)
-                    .update("avatar", imageUrl)
-                    .await()
-
-                // Reload user data to get the latest information
-                authRepository.getUserInfo(firebaseUser.uid)
-                    .onSuccess { user ->
-                        currentUser = user
-                        loginState = ""
+                        // Reload user data to get the latest information
+                        authRepository.getUserInfo(firebaseUser.uid)
+                            .onSuccess { user ->
+                                currentUser = user
+                                loginState = ""
+                            }
+                            .onFailure { e ->
+                                loginState = e.message ?: "Failed to reload user data"
+                            }
                     }
                     .onFailure { e ->
-                        loginState = e.message ?: "Failed to reload user data"
+                        loginState = e.message ?: "Failed to upload image"
                     }
             } catch (e: Exception) {
                 loginState = e.message ?: "Failed to update avatar"
@@ -156,6 +172,81 @@ class AuthViewModel @Inject constructor(
             loginState = "Logged out"
             isLoginSuccessful = false
             currentUser = null
+        }
+    }
+
+    fun resetPassword(email: String) {
+        viewModelScope.launch {
+            if (email.isBlank()) {
+                resetPasswordState = "Please enter your email"
+                return@launch
+            }
+            
+            isLoading = true
+            try {
+                authRepository.sendPasswordResetEmail(email)
+                    .onSuccess {
+                        resetPasswordState = "Password reset email sent"
+                        isResetEmailSent = true
+                    }
+                    .onFailure { e ->
+                        resetPasswordState = e.message ?: "Failed to send reset email"
+                        isResetEmailSent = false
+                    }
+            } catch (e: Exception) {
+                resetPasswordState = e.message ?: "An unexpected error occurred"
+                isResetEmailSent = false
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun clearResetPasswordState() {
+        resetPasswordState = ""
+        isResetEmailSent = false
+    }
+
+    fun updateUserProfile(fullname: String, nickname: String) {
+        val firebaseUser = FirebaseAuth.getInstance().currentUser
+        if (firebaseUser == null) {
+            updateProfileState = "User not logged in"
+            isProfileUpdateSuccessful = false
+            return
+        }
+
+        viewModelScope.launch {
+            isLoading = true
+            try {
+                // Update user document in Firestore
+                FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(firebaseUser.uid)
+                    .update(
+                        mapOf(
+                            "fullname" to fullname,
+                            "nickname" to nickname
+                        )
+                    )
+                    .await()
+
+                // Reload user data to get the latest information
+                authRepository.getUserInfo(firebaseUser.uid)
+                    .onSuccess { user ->
+                        currentUser = user
+                        updateProfileState = "Profile updated successfully"
+                        isProfileUpdateSuccessful = true
+                    }
+                    .onFailure { e ->
+                        updateProfileState = e.message ?: "Failed to reload user data"
+                        isProfileUpdateSuccessful = false
+                    }
+            } catch (e: Exception) {
+                updateProfileState = e.message ?: "Failed to update profile"
+                isProfileUpdateSuccessful = false
+            } finally {
+                isLoading = false
+            }
         }
     }
 }
