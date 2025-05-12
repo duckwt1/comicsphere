@@ -10,7 +10,9 @@
 ## ✨ Description
 
 **ComicSphere** is a modern, feature-rich manga app built using **Kotlin** and **Jetpack Compose**.  
-It allows users to discover trending manga, track reading progress, manage favorites, and read directly from **MangaDex**, all within a sleek, native interface.
+It allows users to discover trending manga, track reading progress, manage favorites, and read directly from **MangaDex**, all within a sleek, native interface.  
+The UI design is inspired by the open-source manga reader **[Kotatsu](https://github.com/KotatsuApp/Kotatsu)** for a clean and intuitive reading experience.
+
 
 ## 🎯 Features
 
