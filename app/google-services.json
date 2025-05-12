@@ -12,7 +12,20 @@
           "package_name": "com.android.dacs3"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "160076674500-m5o8dn15le362a06k8e0pm3j90m97l8a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.android.dacs3",
+            "certificate_hash": "0bbeab5e12ceda94d100d4deafeaa17587a56a9b"
+          }
+        },
+        {
+          "client_id": "160076674500-83qbrp79l2a8c2lj4mcc96kkci7a4p3o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC9aead7h2gD8tCbhedTAMJrnM-qwro5IE"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "160076674500-83qbrp79l2a8c2lj4mcc96kkci7a4p3o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

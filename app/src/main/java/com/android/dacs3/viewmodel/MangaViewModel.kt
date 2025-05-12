@@ -111,6 +111,22 @@ class MangaViewModel @Inject constructor(
     private val _readChapters = MutableStateFlow<Set<String>>(emptySet())
     val readChapters: StateFlow<Set<String>> = _readChapters.asStateFlow()
 
+    // Add new states for chapter reading
+    private val _isLoadingNextChapter = MutableStateFlow(false)
+    val isLoadingNextChapter: StateFlow<Boolean> = _isLoadingNextChapter
+
+    private val _showNextChapterButton = MutableStateFlow(false)
+    val showNextChapterButton: StateFlow<Boolean> = _showNextChapterButton
+
+    private val _showControls = MutableStateFlow(false)
+    val showControls: StateFlow<Boolean> = _showControls
+
+    private val _chapterTitle = MutableStateFlow("")
+    val chapterTitle: StateFlow<String> = _chapterTitle
+
+    private val _chapterError = MutableStateFlow<String?>(null)
+    val chapterError: StateFlow<String?> = _chapterError
+
     init {
         fetchMangaList()
     }
@@ -409,23 +425,40 @@ class MangaViewModel @Inject constructor(
 
     fun loadChapterContent(chapterId: String) {
         viewModelScope.launch {
-            val result = repository.getChapterContent(chapterId)
-            result.onSuccess { response ->
-                val baseUrl = response.baseUrl
-                val hash = response.chapter.hash
-                val imageUrls = response.chapter.data.map { "$baseUrl/data/$hash/$it" }
-
-                _chapterImageUrls.value = imageUrls
-                _totalPages.value = imageUrls.size
+            try {
+                _chapterError.value = null
+                _chapterImageUrls.value = emptyList()
+                _totalPages.value = 0
                 _currentPageReading.value = 1
-            }.onFailure {
-                Log.e("MangaViewModel", "Error loading chapter content", it)
+
+                val result = repository.getChapterContent(chapterId)
+                result.onSuccess { response ->
+                    val baseUrl = response.baseUrl
+                    val hash = response.chapter.hash
+                    val imageUrls = response.chapter.data.map { "$baseUrl/data/$hash/$it" }
+
+                    _chapterImageUrls.value = imageUrls
+                    _totalPages.value = imageUrls.size
+                    _currentPageReading.value = 1
+
+                    // Get chapter title
+                    val chapter = _chapters.value.find { it.id == chapterId }
+                    _chapterTitle.value = chapter?.attributes?.title ?: "Chapter"
+                }.onFailure {
+                    _chapterError.value = "Failed to load chapter content"
+                    Log.e("MangaViewModel", "Error loading chapter content", it)
+                }
+            } catch (e: Exception) {
+                _chapterError.value = "An unexpected error occurred"
+                Log.e("MangaViewModel", "Error loading chapter content", e)
             }
         }
     }
 
     fun updateCurrentPage(page: Int) {
-        _currentPageReading.value = page.coerceIn(1, _totalPages.value)
+        if (page in 1.._totalPages.value) {
+            _currentPageReading.value = page
+        }
     }
 
     fun loadNextChapter(
@@ -434,25 +467,60 @@ class MangaViewModel @Inject constructor(
         language: String,
         onChapterLoaded: (String?) -> Unit
     ) {
+        if (_isLoadingNextChapter.value) return
+
         viewModelScope.launch {
             try {
+                _isLoadingNextChapter.value = true
+                _showNextChapterButton.value = false
+                _chapterError.value = null
+
+                // Load chapters if not already loaded
                 if (_chapters.value.isEmpty()) {
                     loadChapters(mangaId, language)
-                    while (_chapters.value.isEmpty()) {
+                    // Wait for chapters to load with timeout
+                    var attempts = 0
+                    while (_chapters.value.isEmpty() && attempts < 50) {
                         delay(100)
+                        attempts++
+                    }
+                    if (_chapters.value.isEmpty()) {
+                        _chapterError.value = "Failed to load chapters"
+                        onChapterLoaded(null)
+                        return@launch
                     }
                 }
 
                 val currentIndex = _chapters.value.indexOfFirst { it.id == currentChapterId }
                 if (currentIndex != -1 && currentIndex < _chapters.value.size - 1) {
                     val nextChapter = _chapters.value[currentIndex + 1]
+                    
+                    // Save reading progress for current chapter
+                    saveReadingProgress(
+                        mangaId = mangaId,
+                        chapterId = currentChapterId,
+                        language = language,
+                        lastPageIndex = _totalPages.value
+                    )
+
+                    // Clear current chapter data
+                    _chapterImageUrls.value = emptyList()
+                    _totalPages.value = 0
+                    _currentPageReading.value = 1  // Reset to page 1
+                    _chapterTitle.value = ""
+                    
+                    // Notify UI to reload with next chapter
+                    // Thêm thông tin rõ ràng rằng nên bắt đầu từ trang 0
                     onChapterLoaded(nextChapter.id)
                 } else {
                     onChapterLoaded(null)
                 }
             } catch (e: Exception) {
+                _chapterError.value = "Failed to load next chapter"
                 Log.e("MangaViewModel", "Error loading next chapter", e)
                 onChapterLoaded(null)
+            } finally {
+                _isLoadingNextChapter.value = false
             }
         }
     }
@@ -896,7 +964,26 @@ class MangaViewModel @Inject constructor(
             }
         }
     }
+
+    // Add new functions for chapter reading
+    fun toggleControls() {
+        _showControls.value = !_showControls.value
+    }
+
+    fun hideControls() {
+        _showControls.value = false
+    }
+
+    fun updateNextChapterButtonVisibility(isNearEnd: Boolean) {
+        _showNextChapterButton.value = isNearEnd && !_isLoadingNextChapter.value
+    }
+
+    fun clearChapterError() {
+        _chapterError.value = null
+    }
 }
+
+
 
 
 

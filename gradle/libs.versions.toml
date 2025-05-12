@@ -11,6 +11,7 @@ composeBom = "2024.04.01"
 firebaseAuthKtx = "23.2.0"
 playServicesCastFramework = "22.0.0"
 runtimeLivedata = "1.8.0"
+scenecore = "1.0.0-alpha04"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +31,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx", version.ref = "firebaseAuthKtx" }
 play-services-cast-framework = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "playServicesCastFramework" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
+androidx-scenecore = { group = "androidx.xr.scenecore", name = "scenecore", version.ref = "scenecore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
