@@ -95,29 +95,50 @@ fun MangaDetailScreen(
     if (showVipDialog) {
         AlertDialog(
             onDismissRequest = { showVipDialog = false },
-            title = { Text("Giới hạn truyện yêu thích") },
-            text = { 
+            title = {
                 Text(
-                    "Bạn đã đạt giới hạn 3 truyện yêu thích. Nâng cấp lên VIP để thêm không giới hạn truyện vào danh sách yêu thích!"
-                ) 
+                    text = "Favorite Limit Reached",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.Black
+                )
+            },
+            text = {
+                Text(
+                    "You have reached the limit of 3 favorite mangas. Upgrade to VIP to enjoy unlimited favorites!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black
+                )
             },
             confirmButton = {
                 Button(
-                    onClick = { 
+                    onClick = {
                         showVipDialog = false
                         navController.navigate(Screens.VipScreen.route)
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("Nâng cấp VIP")
+                    Text("Upgrade to VIP")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showVipDialog = false }) {
-                    Text("Để sau")
+                TextButton(
+                    onClick = { showVipDialog = false },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.Gray
+                    )
+                ) {
+                    Text("Maybe later")
                 }
-            }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
+
+
     
     val lastReadChapter by viewModel.lastReadChapter.collectAsState()
     val coroutineScope = rememberCoroutineScope()
