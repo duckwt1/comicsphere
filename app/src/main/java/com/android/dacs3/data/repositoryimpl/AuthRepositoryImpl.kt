@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.util.Log
 
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
@@ -62,12 +63,39 @@ class AuthRepositoryImpl @Inject constructor(
                 .await()
 
             if (document.exists()) {
-                val user = document.toObject(User::class.java)
-                Result.success(user!!)
+                // Lấy dữ liệu từ document
+                val uid = document.id
+                val email = document.getString("email") ?: ""
+                val fullname = document.getString("fullname") ?: ""
+                val nickname = document.getString("nickname") ?: ""
+                val avatar = document.getString("avatar") ?: ""
+                val createdAt = document.getTimestamp("createdAt")
+                val isVip = document.getBoolean("isVip") ?: false
+                
+                // Xử lý vipExpireDate có thể là Timestamp hoặc Long
+                val vipExpireDate = when (val expireDate = document.get("vipExpireDate")) {
+                    is com.google.firebase.Timestamp -> expireDate.toDate().time
+                    is Long -> expireDate
+                    else -> 0L
+                }
+                
+                val user = User(
+                    uid = uid,
+                    email = email,
+                    fullname = fullname,
+                    nickname = nickname,
+                    avatar = avatar,
+                    createdAt = createdAt,
+                    isVip = isVip,
+                    vipExpireDate = vipExpireDate
+                )
+                
+                Result.success(user)
             } else {
                 Result.failure(Exception("User not found"))
             }
         } catch (e: Exception) {
+            Log.e("AuthRepositoryImpl", "Error getting user info", e)
             Result.failure(e)
         }
     }
@@ -118,4 +146,5 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 }
+
 

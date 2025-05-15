@@ -14,6 +14,7 @@ import com.android.dacs3.presentations.screens.ProfileScreen
 import com.android.dacs3.viewmodel.AuthViewModel
 import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
+import com.android.dacs3.viewmodel.VipViewModel
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -37,7 +38,14 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Screens.ExploreScreen.route) { ExploreScreen(navController) }
         composable(Screens.ProfileScreen.route) {
             val viewModel: AuthViewModel = hiltViewModel()
-            ProfileScreen(navController = navController,  viewModel)
+            ProfileScreen(navController = navController, viewModel = viewModel)
+        }
+        composable(Screens.VipScreen.route) {
+            val viewModel: VipViewModel = hiltViewModel()
+            VipScreen(
+                navigateBack = { navController.popBackStack() },
+                viewModel = viewModel,
+            )
         }
         composable(Screens.SignUpScreen.route) { SignUpScreen(navController) }
 

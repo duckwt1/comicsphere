@@ -5,9 +5,11 @@ import com.android.dacs3.data.api.MangaDexApi
 import com.android.dacs3.data.repository.AuthRepository
 import com.android.dacs3.data.repository.FavouriteRepository
 import com.android.dacs3.data.repository.MangaRepository
+import com.android.dacs3.data.repository.ZaloPayRepository
 import com.android.dacs3.data.repositoryimpl.AuthRepositoryImpl
 import com.android.dacs3.data.repositoryimpl.FavouriteRepositoryImp
 import com.android.dacs3.data.repositoryimpl.MangaRepositoryImpl
+import com.android.dacs3.data.repositoryimpl.ZaloPayRepositoryImpl
 import com.android.dacs3.utliz.NetworkConnectivityManager
 import com.android.dacs3.utliz.SessionManager
 import com.google.firebase.auth.FirebaseAuth
@@ -42,5 +44,11 @@ abstract class RepositoryModule {
     abstract fun bindMangaRepository(
         mangaRepositoryImpl: MangaRepositoryImpl
     ): MangaRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindZaloPayRepository(
+        zaloPayRepositoryImpl: ZaloPayRepositoryImpl
+    ): ZaloPayRepository
 
 }

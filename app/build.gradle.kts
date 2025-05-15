@@ -10,6 +10,8 @@ val cloudinaryApiSecret = localProperties["cloudinary_api_secret"] as String
 val mailUsername = localProperties["mail_username"] as String
 val mailPassword = localProperties["mail_password"] as String
 
+val keyStorePassword = localProperties["key_store_password"] as String
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -89,6 +91,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.play.services.cast.framework)
     implementation(libs.androidx.runtime.livedata)
+    implementation(libs.androidx.scenecore)
+    implementation(files("D:\\Downloads\\zpdk-release-v3.1.aar"))
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Person
@@ -151,7 +152,15 @@ private fun ProfileContent(
         // Profile information card
         ProfileInfoCard(viewModel = viewModel, navController = navController)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // VIP Button
+        VipButton(
+            isVip = viewModel.currentUser?.isVip == true,
+            navController = navController
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Logout button
         LogoutButton(
@@ -527,6 +536,44 @@ private fun LogoutButton(viewModel: AuthViewModel, navController: NavController)
 
             Text(
                 text = "Logout",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun VipButton(isVip: Boolean, navController: NavController) {
+    Button(
+        onClick = { navController.navigate(Screens.VipScreen.route) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isVip) Color(0xFFFFD700) else Color(0xFF6200EE),
+            contentColor = if (isVip) Color.Black else Color.White
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = "VIP Icon",
+                tint = if (isVip) Color.Black else Color.White
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = if (isVip) "Manage VIP Membership" else "Become VIP Member",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
