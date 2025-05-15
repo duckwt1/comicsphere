@@ -48,29 +48,29 @@ fun VipScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Custom light theme color scheme
-    val customLightColorScheme = lightColorScheme(
-        primary = Color(0xFF3B7FD9),           // Bright blue for primary actions
+    // Light theme color scheme
+    val lightColorScheme = lightColorScheme(
+        primary = Color(0xFF1976D2),           // Blue for primary actions
         onPrimary = Color.White,
-        primaryContainer = Color(0xFFE4F0FF),  // Light blue background
-        secondary = Color(0xFF5E35B1),         // Purple for secondary elements
-        secondaryContainer = Color(0xFFEDE5FF),
-        tertiary = Color(0xFF388E3C),          // Green for success/price elements
-        background = Color(0xFFF8F9FC),        // Very light blue-gray background
-        surface = Color(0xFFFFFFFF),           // White surface
-        surfaceVariant = Color(0xFFF3F6FF),    // Light blue-tinted variant
-        error = Color(0xFFE53935)              // Red for errors
+        primaryContainer = Color(0xFFE3F2FD),  // Light blue background
+        secondary = Color(0xFF673AB7),         // Purple for secondary elements
+        secondaryContainer = Color(0xFFEDE7F6), // Light purple background
+        tertiary = Color(0xFF2E7D32),          // Green for success/price elements
+        background = Color.White,              // White background
+        surface = Color(0xFFF5F5F5),           // Light gray surface
+        surfaceVariant = Color(0xFFEEEEEE),    // Slightly darker variant
+        error = Color(0xFFD32F2F)              // Red for errors
     )
 
-    // Apply the custom theme
-    MaterialTheme(colorScheme = customLightColorScheme) {
+    // Apply the light theme
+    MaterialTheme(colorScheme = lightColorScheme) {
         LaunchedEffect(paymentState) {
             when (paymentState) {
                 PaymentState.SUCCESS -> {
-                    snackbarHostState.showSnackbar("Thanh toán thành công!")
+                    snackbarHostState.showSnackbar("Payment successful!")
                 }
                 PaymentState.ERROR -> {
-                    snackbarHostState.showSnackbar("Thanh toán thất bại. Vui lòng thử lại.")
+                    snackbarHostState.showSnackbar("Payment failed. Please try again.")
                 }
                 else -> {}
             }
@@ -81,7 +81,7 @@ fun VipScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            "Nâng cấp VIP",
+                            "VIP Upgrade",
                             fontWeight = FontWeight.Bold
                         )
                     },
@@ -122,22 +122,23 @@ fun VipScreen(
 
                 // VIP Package Options
                 Text(
-                    text = if (isVip) "Gia hạn gói VIP" else "Chọn gói VIP phù hợp",
+                    text = if (isVip) "Renew VIP Subscription" else "Choose Your VIP Plan",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    color = MaterialTheme.colorScheme.primary
                 )
 
                 // VIP Package Cards
                 VipPackageCard(
-                    title = "1 tháng",
+                    title = "1 Month",
                     price = "50,000đ",
                     isPopular = false,
                     onClick = {
                         viewModel.setSelectedMonths(1)
                         viewModel.setSelectedAmount(50000)
-                        viewModel.setSelectedDescription("Nâng cấp VIP ComicSphere - 1 tháng")
+                        viewModel.setSelectedDescription("ComicSphere VIP Upgrade - 1 Month")
                         viewModel.purchaseVip(context as Activity, 1, 50000)
                     },
                     isLoading = paymentState == PaymentState.LOADING && viewModel.selectedMonths.collectAsStateWithLifecycle().value == 1
@@ -146,14 +147,14 @@ fun VipScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 VipPackageCard(
-                    title = "3 tháng",
+                    title = "3 Months",
                     price = "135,000đ",
                     discount = "10%",
                     isPopular = true,
                     onClick = {
                         viewModel.setSelectedMonths(3)
                         viewModel.setSelectedAmount(135000)
-                        viewModel.setSelectedDescription("Nâng cấp VIP ComicSphere - 3 tháng")
+                        viewModel.setSelectedDescription("ComicSphere VIP Upgrade - 3 Months")
                         viewModel.purchaseVip(context as Activity, 3, 135000)
                     },
                     isLoading = paymentState == PaymentState.LOADING && viewModel.selectedMonths.collectAsStateWithLifecycle().value == 3
@@ -162,14 +163,14 @@ fun VipScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 VipPackageCard(
-                    title = "12 tháng",
+                    title = "12 Months",
                     price = "480,000đ",
                     discount = "20%",
                     isPopular = false,
                     onClick = {
                         viewModel.setSelectedMonths(12)
                         viewModel.setSelectedAmount(480000)
-                        viewModel.setSelectedDescription("Nâng cấp VIP ComicSphere - 12 tháng")
+                        viewModel.setSelectedDescription("ComicSphere VIP Upgrade - 12 Months")
                         viewModel.purchaseVip(context as Activity, 12, 480000)
                     },
                     isLoading = paymentState == PaymentState.LOADING && viewModel.selectedMonths.collectAsStateWithLifecycle().value == 12
@@ -190,11 +191,11 @@ fun VipScreen(
 fun VipHeaderBanner(isVip: Boolean, vipExpireDate: Long) {
     val gradientBrush = if (isVip) {
         Brush.horizontalGradient(
-            colors = listOf(Color(0xFF5E35B1), Color(0xFF3B7FD9))
+            colors = listOf(Color(0xFF9575CD), Color(0xFF7986CB))
         )
     } else {
         Brush.horizontalGradient(
-            colors = listOf(Color(0xFF3B7FD9), Color(0xFF3F51B5))
+            colors = listOf(Color(0xFF7986CB), Color(0xFF5C6BC0))
         )
     }
 
@@ -222,24 +223,24 @@ fun VipHeaderBanner(isVip: Boolean, vipExpireDate: Long) {
 
             if (isVip) {
                 Text(
-                    text = "Bạn đang là thành viên VIP",
+                    text = "You are a VIP Member",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
 
-                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val dateFormat = SimpleDateFormat("MM/dd/yyyy", Locale.getDefault())
                 val expireDateStr = dateFormat.format(Date(vipExpireDate))
 
                 Text(
-                    text = "Hết hạn: $expireDateStr",
+                    text = "Expires: $expireDateStr",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White,
                     modifier = Modifier.padding(top = 8.dp)
                 )
             } else {
                 Text(
-                    text = "Trải nghiệm đặc quyền VIP",
+                    text = "Experience VIP Privileges",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -247,7 +248,7 @@ fun VipHeaderBanner(isVip: Boolean, vipExpireDate: Long) {
                 )
 
                 Text(
-                    text = "Nâng cao trải nghiệm đọc truyện của bạn",
+                    text = "Enhance your reading experience",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
@@ -266,7 +267,7 @@ fun VipBenefitsSection() {
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
@@ -276,19 +277,20 @@ fun VipBenefitsSection() {
                 .fillMaxWidth()
         ) {
             Text(
-                text = "Đặc quyền thành viên VIP:",
+                text = "VIP Member Benefits:",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Liệt kê các đặc quyền VIP với icon
-            VipBenefitItem("Không hiển thị quảng cáo")
-            VipBenefitItem("Truy cập tất cả truyện độc quyền")
-            VipBenefitItem("Tải truyện để đọc offline")
-            VipBenefitItem("Hỗ trợ ưu tiên 24/7")
-            VipBenefitItem("Cập nhật truyện mới sớm nhất")
+            // List VIP benefits with icons
+            VipBenefitItem("Ad-free experience")
+            VipBenefitItem("Access to all exclusive comics")
+            VipBenefitItem("Download comics for offline reading")
+            VipBenefitItem("Priority 24/7 support")
+            VipBenefitItem("Early access to new releases")
         }
     }
 }
@@ -312,7 +314,8 @@ fun VipBenefitItem(benefit: String) {
 
         Text(
             text = benefit,
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -333,7 +336,7 @@ fun VipPackageCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isPopular)
-                MaterialTheme.colorScheme.primaryContainer
+                MaterialTheme.colorScheme.secondaryContainer
             else
                 MaterialTheme.colorScheme.surface
         ),
@@ -352,7 +355,7 @@ fun VipPackageCard(
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     Text(
-                        "Phổ biến nhất",
+                        "Most Popular",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -382,11 +385,11 @@ fun VipPackageCard(
                 Card(
                     shape = RoundedCornerShape(4.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
+                        containerColor = Color(0xFFE8F5E9)
                     )
                 ) {
                     Text(
-                        text = "Tiết kiệm $discount",
+                        text = "Save $discount",
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Medium,
                         fontSize = 12.sp,
@@ -408,18 +411,19 @@ fun VipPackageCard(
                     containerColor = if (isPopular)
                         MaterialTheme.colorScheme.secondary
                     else
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White
                 )
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color.White,
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
-                        "Chọn gói này",
+                        "Select Plan",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
@@ -442,11 +446,12 @@ fun PaymentStatusIndicator(paymentState: PaymentState) {
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Đang xử lý thanh toán...",
+                    text = "Processing payment...",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -458,10 +463,10 @@ fun PaymentStatusIndicator(paymentState: PaymentState) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.errorContainer
+                color = Color(0xFFFFEBEE)
             ) {
                 Text(
-                    text = "Thanh toán thất bại. Vui lòng thử lại.",
+                    text = "Payment failed. Please try again.",
                     color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
@@ -475,7 +480,7 @@ fun PaymentStatusIndicator(paymentState: PaymentState) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFFDCEDC8) // Light green for success
+                color = Color(0xFFE8F5E9) // Light green for success
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -485,19 +490,18 @@ fun PaymentStatusIndicator(paymentState: PaymentState) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = Color(0xFF388E3C)
+                        tint = MaterialTheme.colorScheme.tertiary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Thanh toán thành công!",
-                        color = Color(0xFF388E3C),
+                        text = "Payment successful!",
+                        color = MaterialTheme.colorScheme.tertiary,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                 }
             }
         }
-        else -> { /* Không hiển thị gì */ }
+        else -> { /* Don't display anything */ }
     }
 }
-

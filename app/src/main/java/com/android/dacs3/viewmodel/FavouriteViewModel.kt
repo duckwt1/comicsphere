@@ -13,6 +13,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 @HiltViewModel
 class FavouriteViewModel @Inject constructor(
@@ -34,6 +36,52 @@ class FavouriteViewModel @Inject constructor(
 
     private val _isDeleting = MutableLiveData<Boolean>(false)
     val isDeleting: LiveData<Boolean> = _isDeleting
+
+    // Thêm các state mới
+    private val _isVip = MutableLiveData<Boolean>(false)
+    val isVip: LiveData<Boolean> = _isVip
+
+    private val _maxFavouritesReached = MutableLiveData<Boolean>(false)
+    val maxFavouritesReached: LiveData<Boolean> = _maxFavouritesReached
+
+    // Số lượng tối đa truyện yêu thích cho người dùng không phải VIP
+    private val MAX_FREE_FAVOURITES = 3
+
+    init {
+        // Kiểm tra trạng thái VIP khi khởi tạo
+        checkVipStatus()
+    }
+
+    private fun checkVipStatus() {
+        val userId = firebaseAuth.currentUser?.uid
+        if (userId != null) {
+            viewModelScope.launch {
+                try {
+                    // Sử dụng Firestore để kiểm tra trạng thái VIP
+                    val db = FirebaseFirestore.getInstance()
+                    val userDoc = db.collection("users").document(userId).get().await()
+                    
+                    val isVip = userDoc.getBoolean("isVip") ?: false
+                    val vipExpireDate = when (val expireDate = userDoc.get("vipExpireDate")) {
+                        is com.google.firebase.Timestamp -> expireDate.toDate().time
+                        is Long -> expireDate
+                        else -> 0L
+                    }
+                    
+                    // Kiểm tra xem VIP có còn hiệu lực không
+                    val isVipValid = isVip && vipExpireDate > System.currentTimeMillis()
+                    _isVip.value = isVipValid
+                    
+                    Log.d("FavouriteViewModel", "User VIP status: $isVipValid")
+                } catch (e: Exception) {
+                    Log.e("FavouriteViewModel", "Error checking VIP status", e)
+                    _isVip.value = false
+                }
+            }
+        } else {
+            _isVip.value = false
+        }
+    }
 
     fun loadFavourites() {
         val userId = firebaseAuth.currentUser?.uid
@@ -81,6 +129,18 @@ class FavouriteViewModel @Inject constructor(
         if (userId != null) {
             viewModelScope.launch {
                 _loading.value = true
+                
+                // Kiểm tra số lượng truyện yêu thích hiện tại
+                if (_isVip.value != true) {
+                    val currentFavourites = _favourites.value ?: emptyList()
+                    if (currentFavourites.size >= MAX_FREE_FAVOURITES && !currentFavourites.contains(mangaId)) {
+                        // Hiển thị thông báo đã đạt giới hạn
+                        _maxFavouritesReached.value = true
+                        _loading.value = false
+                        return@launch
+                    }
+                }
+                
                 val result = repository.addFavourite(userId, mangaId)
                 if (result.isSuccess) {
                     // Update favorites list
@@ -170,5 +230,15 @@ class FavouriteViewModel @Inject constructor(
     // Clear error message
     fun clearError() {
         _error.value = null
+    }
+
+    // Reset thông báo giới hạn
+    fun resetMaxFavouritesReached() {
+        _maxFavouritesReached.value = false
+    }
+
+    // Refresh trạng thái VIP
+    fun refreshVipStatus() {
+        checkVipStatus()
     }
 }

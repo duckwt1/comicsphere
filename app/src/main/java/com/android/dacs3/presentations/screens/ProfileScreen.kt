@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -551,13 +552,17 @@ private fun VipButton(isVip: Boolean, navController: NavController) {
             .fillMaxWidth()
             .height(54.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isVip) Color(0xFFFFD700) else Color(0xFF6200EE),
-            contentColor = if (isVip) Color.Black else Color.White
+            containerColor = if (isVip) Color(0xFFFFD700) else Color(0xFF424242),
+            contentColor = if (isVip) Color(0xFF212121) else Color.White
         ),
         shape = RoundedCornerShape(12.dp),
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = 4.dp,
             pressedElevation = 8.dp
+        ),
+        border = BorderStroke(
+            width = if (isVip) 1.dp else 0.dp,
+            color = if (isVip) Color(0xFFBFA000) else Color.Transparent
         )
     ) {
         Row(
@@ -567,7 +572,7 @@ private fun VipButton(isVip: Boolean, navController: NavController) {
             Icon(
                 imageVector = Icons.Default.Star,
                 contentDescription = "VIP Icon",
-                tint = if (isVip) Color.Black else Color.White
+                tint = if (isVip) Color(0xFF212121) else Color(0xFFFFD700)
             )
 
             Spacer(modifier = Modifier.width(8.dp))

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -42,9 +43,18 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.setValue
 import com.android.dacs3.presentations.components.MangaItem
+import com.android.dacs3.utliz.Screens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,54 +67,48 @@ fun FavouriteScreen(
     val isRefreshing by viewModel.loading.observeAsState(false)
     val isDeleting by viewModel.isDeleting.observeAsState(false)
     val error by viewModel.error.observeAsState()
+    val isVip by viewModel.isVip.observeAsState(false)
+    
+    // Refresh VIP status when screen is shown
+    LaunchedEffect(Unit) {
+        viewModel.refreshVipStatus()
+    }
     
     var showDropdownMenu by remember { mutableStateOf(false) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var showVipLimitInfo by remember { mutableStateOf(false) }
 
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
 
     LaunchedEffect(favourites) {
         viewModel.loadFavouriteDetails()
     }
-    
-    // Dialog xác nhận xóa tất cả yêu thích
-    if (showDeleteAllDialog) {
-        DeleteConfirmationDialog(
-            title = "Delete All Favourites",
-            message = "Are you sure you want to delete all your favourites? This action cannot be undone.",
-            onConfirm = {
-                viewModel.deleteAllFavourites()
-                showDeleteAllDialog = false
-            },
-            onDismiss = { showDeleteAllDialog = false }
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            "Favourites",
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF333333)
-                        )
-                    }
-                },
+                title = { Text("Favourites", color = Color.Black) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFF8F8F8),
-                    titleContentColor = Color.Black
+                    containerColor = Color.White,
+                    titleContentColor = Color.Black,
+                    actionIconContentColor = Color(0xFF333333)
                 ),
                 actions = {
+                    // VIP Limit Info Button (only for non-VIP users)
+                    if (!isVip) {
+                        IconButton(onClick = { showVipLimitInfo = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "VIP Info"
+                            )
+                        }
+                    }
+
                     // Menu dropdown for delete all favourites
                     Box {
                         IconButton(onClick = { showDropdownMenu = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "More options",
-                                tint = Color(0xFF333333)
+                                contentDescription = "More options"
                             )
                         }
 
@@ -129,19 +133,71 @@ fun FavouriteScreen(
                             )
                         }
                     }
-                    
-                    if (error != null) {
-                        Text(
-                            text = error ?: "Unknown error",
-                            color = Color.Red,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
                 }
             )
         },
         bottomBar = { BottomNavigationBar(navController) }
-    ) { innerPadding ->
+    )
+ { paddingValues ->
+        // VIP Limit Info Dialog
+        if (showVipLimitInfo) {
+            AlertDialog(
+                onDismissRequest = { showVipLimitInfo = false },
+                containerColor = Color.White,
+                titleContentColor = Color.Black,
+                textContentColor = Color.Black,
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showVipLimitInfo = false
+                            navController.navigate(Screens.VipScreen.route)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Upgrade to VIP")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showVipLimitInfo = false },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text("Close")
+                    }
+                },
+                title = { Text("Favorite Limit Reached") },
+                text = {
+                    Column {
+                        Text("Regular users can save up to 3 favorite mangas.")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Upgrade to VIP to save unlimited favorites!")
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LinearProgressIndicator(
+                            progress = (favourites.size.toFloat() / 3f).coerceAtMost(1f),
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color.Black,
+                            trackColor = Color.LightGray
+                        )
+                        Text(
+                            text = "${favourites.size}/3 favorite mangas used",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Black,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            )
+        }
+
+
+
+
         SwipeRefresh(
             state = swipeRefreshState,
             onRefresh = {
@@ -150,7 +206,7 @@ fun FavouriteScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF8F8F8))
-                .padding(innerPadding)
+                .padding(paddingValues)
         ) {
             Column(modifier = Modifier.padding(horizontal = 8.dp)) {
                 if (error != null) {

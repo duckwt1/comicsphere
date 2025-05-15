@@ -77,6 +77,48 @@ fun MangaDetailScreen(
 
     var isDescriptionExpanded by remember { mutableStateOf(false) }
     val isFavourite by favViewModel.isFavourite.observeAsState(false)
+    val isVip by favViewModel.isVip.observeAsState(false)
+    val maxFavouritesReached by favViewModel.maxFavouritesReached.observeAsState(false)
+    
+    // Thêm state cho dialog
+    var showVipDialog by remember { mutableStateOf(false) }
+    
+    // Hiển thị dialog khi đạt giới hạn
+    LaunchedEffect(maxFavouritesReached) {
+        if (maxFavouritesReached) {
+            showVipDialog = true
+            favViewModel.resetMaxFavouritesReached()
+        }
+    }
+    
+    // VIP Dialog
+    if (showVipDialog) {
+        AlertDialog(
+            onDismissRequest = { showVipDialog = false },
+            title = { Text("Giới hạn truyện yêu thích") },
+            text = { 
+                Text(
+                    "Bạn đã đạt giới hạn 3 truyện yêu thích. Nâng cấp lên VIP để thêm không giới hạn truyện vào danh sách yêu thích!"
+                ) 
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showVipDialog = false
+                        navController.navigate(Screens.VipScreen.route)
+                    }
+                ) {
+                    Text("Nâng cấp VIP")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVipDialog = false }) {
+                    Text("Để sau")
+                }
+            }
+        )
+    }
+    
     val lastReadChapter by viewModel.lastReadChapter.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -583,4 +625,5 @@ fun ChapterItem(
         )
     }
 }
+
 
