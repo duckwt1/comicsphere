@@ -33,6 +33,9 @@ class ZaloPayRepositoryImpl @Inject constructor(
     // Lưu thông tin số tháng VIP cho mỗi giao dịch
     private val paymentMonths = mutableMapOf<String, Int>()
 
+    // Thêm một map mới để lưu trữ số tháng đã xử lý
+    private val processedPayments = mutableMapOf<String, Int>()
+
     override fun initSdk(activity: Activity) {
         ZaloPaySDK.init(AppInfo.APP_ID, Environment.SANDBOX)
         Log.d(TAG, "ZaloPay SDK initialized with APP_ID: ${AppInfo.APP_ID}")
@@ -42,22 +45,28 @@ class ZaloPayRepositoryImpl @Inject constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val createOrder = CreateOrder()
+                Log.d(TAG, "Creating order with amount: $amount, description: $description")
+                
                 val jsonData = createOrder.createOrder(amount.toString())
-                if (jsonData != null) {
-                    val returnCode = jsonData.getString("return_code")
-                    if (returnCode == "1") {
-                        val token = jsonData.getString("zp_trans_token")
-                        // Sử dụng optString thay vì getString để tránh lỗi khi không có key
-                        val appTransId = jsonData.optString("app_trans_id", "")
-                        Log.d(TAG, "Order created successfully with token: $token")
-                        Result.success(token)
-                    } else {
-                        val returnMessage = jsonData.optString("return_message", "Unknown error")
-                        Log.e(TAG, "Failed to create order: $returnMessage")
-                        Result.failure(Exception("Failed to create order: $returnMessage"))
-                    }
+                
+                if (jsonData == null) {
+                    Log.e(TAG, "Failed to create order: No response data")
+                    return@withContext Result.failure(Exception("Failed to create order: No response data"))
+                }
+                
+                Log.d(TAG, "ZaloPay API response: $jsonData")
+                
+                val returnCode = jsonData.getString("return_code")
+                val returnMessage = jsonData.optString("return_message", "Unknown error")
+                
+                if (returnCode == "1") {
+                    val token = jsonData.getString("zp_trans_token")
+                    val appTransId = jsonData.optString("app_trans_id", "")
+                    Log.d(TAG, "Order created successfully with token: $token, appTransId: $appTransId")
+                    Result.success(token)
                 } else {
-                    Result.failure(Exception("Failed to create order: No response data"))
+                    Log.e(TAG, "Failed to create order: $returnMessage (code: $returnCode)")
+                    Result.failure(Exception("Failed to create order: $returnMessage (code: $returnCode)"))
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating order", e)
@@ -70,6 +79,7 @@ class ZaloPayRepositoryImpl @Inject constructor(
         return try {
             // Lưu số tháng VIP cho token này
             paymentMonths[token] = months
+            Log.d(TAG, "Starting payment with token: $token, months: $months")
             
             ZaloPaySDK.getInstance().payOrder(
                 activity, 
@@ -77,31 +87,35 @@ class ZaloPayRepositoryImpl @Inject constructor(
                 "comicsphere://zalopay.callback",
                 object : PayOrderListener {
                     override fun onPaymentSucceeded(transactionId: String, transToken: String, appTransID: String) {
-                        Log.d(TAG, "Payment succeeded: $transactionId")
+                        Log.d(TAG, "Payment succeeded via SDK callback: transactionId=$transactionId, transToken=$transToken")
                         // Khi thanh toán thành công, cập nhật trạng thái VIP
                         val userId = FirebaseAuth.getInstance().currentUser?.uid
                         if (userId != null) {
                             // Lấy số tháng đã lưu hoặc mặc định là 1 tháng
                             val durationMonths = paymentMonths[transToken] ?: 1
+                            Log.d(TAG, "Updating VIP status for user $userId with $durationMonths months")
                             updateVipStatusAfterPayment(userId, durationMonths)
                             // Xóa khỏi map sau khi đã xử lý
                             paymentMonths.remove(transToken)
+                        } else {
+                            Log.e(TAG, "User ID is null, cannot update VIP status")
                         }
                     }
 
                     override fun onPaymentCanceled(zpTransToken: String, appTransID: String) {
-                        Log.d(TAG, "Payment canceled: $zpTransToken")
+                        Log.d(TAG, "Payment canceled via SDK callback: token=$zpTransToken")
                         // Xóa khỏi map khi hủy
                         paymentMonths.remove(zpTransToken)
                     }
 
                     override fun onPaymentError(zaloPayError: ZaloPayError, zpTransToken: String, appTransID: String) {
-                        Log.e(TAG, "Payment error: ${zaloPayError.toString()}")
+                        Log.e(TAG, "Payment error via SDK callback: ${zaloPayError.toString()}, token=$zpTransToken")
                         // Xóa khỏi map khi lỗi
                         paymentMonths.remove(zpTransToken)
                     }
                 }
             )
+            Log.d(TAG, "Payment initiated successfully")
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error processing payment", e)
@@ -137,8 +151,17 @@ class ZaloPayRepositoryImpl @Inject constructor(
                     
                     // Lấy số tháng đã lưu hoặc mặc định là 1 tháng
                     val durationMonths = if (transToken != null) {
-                        paymentMonths[transToken] ?: 1
+                        val months = paymentMonths[transToken]
+                        Log.d(TAG, "Retrieved months from map for token $transToken: $months")
+                        
+                        // Lưu số tháng vào processedPayments trước khi xóa khỏi paymentMonths
+                        if (months != null) {
+                            processedPayments[transToken] = months
+                        }
+                        
+                        months ?: 1
                     } else {
+                        Log.d(TAG, "No token found in callback, using default 1 month")
                         1 // Mặc định 1 tháng nếu không có token
                     }
                     
@@ -359,10 +382,17 @@ class ZaloPayRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override fun getMonthsForToken(token: String): Int? {
+        // Kiểm tra trong paymentMonths trước, nếu không có thì kiểm tra trong processedPayments
+        return paymentMonths[token] ?: processedPayments[token]
+    }
+
+    override fun saveMonthsForToken(token: String, months: Int) {
+        paymentMonths[token] = months
+        Log.d(TAG, "Saved $months months for token $token")
+    }
 }
-
-
-
 
 
 

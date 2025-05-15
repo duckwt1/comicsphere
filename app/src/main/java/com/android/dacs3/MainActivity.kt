@@ -86,15 +86,29 @@ class MainActivity : ComponentActivity() {
                 val isSuccess = code == "1" // 1 = success
                 Log.d("MainActivity", "Received ZaloPay callback, code: $code, isSuccess: $isSuccess")
 
+                // Lấy token từ callback
+                val transToken = uri.getQueryParameter("zpTransToken")
+                
+                // Lấy số tháng từ ZaloPayRepository trước khi xử lý callback
+                val months = if (transToken != null) {
+                    val retrievedMonths = zaloPayRepository.getMonthsForToken(transToken)
+                    Log.d("MainActivity", "Retrieved months for token $transToken: $retrievedMonths")
+                    retrievedMonths ?: 1
+                } else {
+                    Log.d("MainActivity", "No token in callback, using default 1 month")
+                    1 // Mặc định 1 tháng nếu không có token
+                }
+
                 // Sử dụng ZaloPayRepository để xử lý callback
                 val processed = zaloPayRepository.processZaloPayCallback(uri)
-
                 Log.d("MainActivity", "ZaloPay callback processed: $processed")
                 
                 // Thông báo cho VipViewModel
                 if (isSuccess) {
-                    vipViewModel.handleZaloPayResult(true)
-                    Log.d("MainActivity", "Notified VipViewModel of successful payment")
+                    Log.d("MainActivity", "Notifying VipViewModel of successful payment with $months months")
+                    vipViewModel.handleZaloPayResult(true, months)
+                } else {
+                    vipViewModel.handleZaloPayResult(false)
                 }
             }
         } catch (e: Exception) {
@@ -102,6 +116,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+
+
+
 
 
 

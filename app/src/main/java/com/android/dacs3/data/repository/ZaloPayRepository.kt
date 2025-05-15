@@ -20,4 +20,10 @@ interface ZaloPayRepository {
     
     // Thêm phương thức để kiểm tra kết quả thanh toán từ callback URL
     fun processZaloPayCallback(uri: android.net.Uri): Boolean
+
+    // Thêm phương thức để lấy số tháng từ token
+    fun getMonthsForToken(token: String): Int?
+
+    // Thêm phương thức để lưu số tháng cho token
+    fun saveMonthsForToken(token: String, months: Int)
 }

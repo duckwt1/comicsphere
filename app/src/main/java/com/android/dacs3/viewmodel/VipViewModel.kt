@@ -32,6 +32,17 @@ class VipViewModel @Inject constructor(
     private val _vipExpireDate = MutableLiveData<Long>()
     val vipExpireDate: LiveData<Long> = _vipExpireDate
 
+    // Lưu thông tin số tháng VIP cho mỗi giao dịch
+    private val _selectedMonths = MutableStateFlow(1)
+    val selectedMonths: StateFlow<Int> = _selectedMonths.asStateFlow()
+    
+    // Thêm state cho số tiền và mô tả
+    private val _selectedAmount = MutableStateFlow(50000L)
+    val selectedAmount: StateFlow<Long> = _selectedAmount.asStateFlow()
+    
+    private val _selectedDescription = MutableStateFlow("Nâng cấp VIP ComicSphere - 1 tháng")
+    val selectedDescription: StateFlow<String> = _selectedDescription.asStateFlow()
+
     init {
         checkVipStatus()
     }
@@ -67,17 +78,23 @@ class VipViewModel @Inject constructor(
             _paymentState.value = PaymentState.LOADING
 
             try {
-                val description = "Nâng cấp VIP ComicSphere - $months tháng"
+                val description = _selectedDescription.value
+                Log.d("VipViewModel", "Creating order for $months months, amount: $amount, description: $description")
                 val orderResult = zaloPayRepository.createOrder(amount, description)
 
                 if (orderResult.isSuccess) {
                     val token = orderResult.getOrThrow()
+                    Log.d("VipViewModel", "Order created successfully with token: $token, initiating payment for $months months")
+                    
+                    // Lưu số tháng cho token này
+                    zaloPayRepository.saveMonthsForToken(token, months)
+                    
                     val payResult = zaloPayRepository.payOrder(activity, token, months)
 
                     if (payResult.isSuccess) {
                         // Thanh toán đã được khởi tạo thành công
                         // Kết quả thực tế sẽ được xử lý trong callback
-                        Log.d("VipViewModel", "Payment initiated successfully")
+                        Log.d("VipViewModel", "Payment initiated successfully for $months months")
                     } else {
                         _paymentState.value = PaymentState.ERROR
                         Log.e("VipViewModel", "Error initiating payment", payResult.exceptionOrNull())
@@ -93,7 +110,22 @@ class VipViewModel @Inject constructor(
         }
     }
 
-    fun handleZaloPayResult(isSuccess: Boolean, months: Int = 1) {
+    fun setSelectedMonths(months: Int) {
+        _selectedMonths.value = months
+        Log.d("VipViewModel", "Selected months set to: $months")
+    }
+    
+    fun setSelectedAmount(amount: Long) {
+        _selectedAmount.value = amount
+        Log.d("VipViewModel", "Selected amount set to: $amount")
+    }
+    
+    fun setSelectedDescription(description: String) {
+        _selectedDescription.value = description
+        Log.d("VipViewModel", "Selected description set to: $description")
+    }
+
+    fun handleZaloPayResult(isSuccess: Boolean, months: Int = _selectedMonths.value) {
         viewModelScope.launch {
             Log.d("VipViewModel", "Handling ZaloPay result: isSuccess=$isSuccess, months=$months")
             
@@ -140,6 +172,9 @@ class VipViewModel @Inject constructor(
 enum class PaymentState {
     IDLE, LOADING, SUCCESS, ERROR, CANCELED
 }
+
+
+
 
 
 
