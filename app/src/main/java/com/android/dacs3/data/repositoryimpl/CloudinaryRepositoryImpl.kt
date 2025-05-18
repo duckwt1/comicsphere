@@ -30,20 +30,32 @@ class CloudinaryRepositoryImpl @Inject constructor() : CloudinaryRepository {
             isMediaManagerInitialized = true
         }
     }
+    
     override suspend fun uploadImage(imageUri: Uri): Result<String> = try {
-        val url = uploadImageInternal(imageUri)
+        val url = uploadImageInternal(imageUri, "comicsphere_avatar", "c_fill,w_200,h_200")
         Result.success(url)
     } catch (e: Exception) {
         Result.failure(e)
     }
     
-    private suspend fun uploadImageInternal(imageUri: Uri): String = 
+    override suspend fun uploadCoverImage(imageUri: Uri): Result<String> = try {
+        val url = uploadImageInternal(imageUri, "comicsphere_covers", "c_fill,w_800,h_1200")
+        Result.success(url)
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+    
+    private suspend fun uploadImageInternal(
+        imageUri: Uri, 
+        folder: String, 
+        transformation: String
+    ): String = 
         suspendCancellableCoroutine { continuation ->
             MediaManager.get()
                 .upload(imageUri)
-                .option("folder", "comicsphere_avatar")
+                .option("folder", folder)
                 .option("resource_type", "image")
-                .option("transformation", "c_fill,w_200,h_200")
+                .option("transformation", transformation)
                 .callback(object : UploadCallback {
                     override fun onStart(requestId: String) {
                         // Upload started

@@ -1,6 +1,5 @@
 package com.android.dacs3.presentations.navigation
 
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -12,10 +11,12 @@ import androidx.navigation.navArgument
 import com.android.dacs3.presentations.screens.*
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.presentations.screens.ProfileScreen
+import com.android.dacs3.viewmodel.AdminViewModel
 import com.android.dacs3.viewmodel.AuthViewModel
 import com.android.dacs3.viewmodel.FavouriteViewModel
 import com.android.dacs3.viewmodel.MangaViewModel
 import com.android.dacs3.viewmodel.VipViewModel
+import com.android.dacs3.presentations.screens.AdminDashboardScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -94,27 +95,21 @@ fun AppNavGraph(navController: NavHostController) {
         }
 
         composable(Screens.AdminDashboardScreen.route) {
-            val viewModel: AuthViewModel = hiltViewModel()
-            AdminDashboardScreen(navController = navController, authViewModel = viewModel)
-        }
-
-        composable(Screens.AdminUserManagementScreen.route) {
-            AdminUserManagementScreen(navController = navController)
+            val authViewModel: AuthViewModel = hiltViewModel()
+            AdminDashboardScreen(navController = navController, authViewModel = authViewModel)
         }
 
         composable(Screens.AdminMangaManagementScreen.route) {
-            // Implement later
-            Text("Manga Management Screen")
+            val viewModel: AdminViewModel = hiltViewModel()
+            AdminMangaManagementScreen(navController = navController, viewModel = viewModel)
         }
 
-        composable(Screens.AdminStatisticsScreen.route) {
-            // Implement later
-            Text("Statistics Screen")
+        composable(Screens.AdminUserManagementScreen.route) {
+            val viewModel: AdminViewModel = hiltViewModel()
+            AdminUserManagementScreen(navController = navController, viewModel = viewModel)
         }
 
-        composable(Screens.AdminSettingsScreen.route) {
-            // Implement later
-            Text("Admin Settings Screen")
-        }
+
+
     }
 }

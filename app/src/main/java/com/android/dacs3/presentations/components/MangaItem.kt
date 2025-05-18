@@ -15,10 +15,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.displayCoverUrl
 import com.android.dacs3.utliz.Screens
 import android.util.Log
+import com.android.dacs3.data.model.MangaData
 
 @Composable
 fun MangaItem(

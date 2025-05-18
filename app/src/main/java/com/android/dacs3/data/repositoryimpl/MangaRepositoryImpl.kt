@@ -15,7 +15,6 @@ import android.util.Log
 import com.android.dacs3.data.model.ChapterAttributes
 import com.android.dacs3.data.model.Comment
 import com.android.dacs3.data.model.MangaAttributes
-import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.ReadingProgress
 import com.android.dacs3.data.model.Relationship
 import com.android.dacs3.data.model.RelationshipAttributes
@@ -27,6 +26,7 @@ import com.android.dacs3.data.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import android.content.Context
+import com.android.dacs3.data.model.MangaData
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.google.firebase.firestore.FieldPath

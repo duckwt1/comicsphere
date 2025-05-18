@@ -99,16 +99,6 @@ fun AdminDashboardScreen(
                     title = "Manga Management",
                     icon = Icons.Default.Info,
                     route = Screens.AdminMangaManagementScreen.route
-                ),
-                AdminFeature(
-                    title = "Statistics",
-                    icon = Icons.Default.Build,
-                    route = Screens.AdminStatisticsScreen.route
-                ),
-                AdminFeature(
-                    title = "Settings",
-                    icon = Icons.Default.Settings,
-                    route = Screens.AdminSettingsScreen.route
                 )
             )
 

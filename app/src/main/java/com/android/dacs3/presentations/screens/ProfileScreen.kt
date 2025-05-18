@@ -607,7 +607,10 @@ private fun VipButton(isVip: Boolean, navController: NavController) {
 @Composable
 private fun AdminDashboardButton(navController: NavController) {
     Button(
-        onClick = { navController.navigate(Screens.AdminDashboardScreen.route) },
+        onClick = { 
+            // Đảm bảo sử dụng đúng route
+            navController.navigate(Screens.AdminDashboardScreen.route) 
+        },
         modifier = Modifier
             .fillMaxWidth()
             .height(54.dp),
@@ -627,16 +630,14 @@ private fun AdminDashboardButton(navController: NavController) {
         ) {
             Icon(
                 imageVector = Icons.Default.Settings,
-                contentDescription = "Admin Dashboard Icon",
+                contentDescription = null,
                 tint = Color.White
             )
-
             Spacer(modifier = Modifier.width(8.dp))
-
             Text(
                 text = "Admin Dashboard",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
