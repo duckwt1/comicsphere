@@ -4,7 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -16,8 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.android.dacs3.data.model.MangaData
-import com.android.dacs3.data.model.coverImageUrl
+import com.android.dacs3.data.model.displayCoverUrl
 import com.android.dacs3.utliz.Screens
+import android.util.Log
 
 @Composable
 fun MangaItem(
@@ -26,8 +27,13 @@ fun MangaItem(
     modifier: Modifier = Modifier
 ) {
     val title = manga.attributes.title["en"] ?: "Unknown Title"
-    val imageUrl = manga.coverImageUrl
-
+    val imageUrl = manga.displayCoverUrl
+    
+    // Log URL ảnh bìa
+    LaunchedEffect(manga.id) {
+        Log.d("MangaItem", "Manga ${manga.id} - Title: $title - Cover URL: $imageUrl")
+    }
+    
     Column(
         modifier = modifier
             .width(120.dp)
@@ -45,14 +51,12 @@ fun MangaItem(
                 .height(160.dp)
                 .fillMaxWidth()
         ) {
-            if (imageUrl != null) {
-                Image(
-                    painter = rememberAsyncImagePainter(imageUrl),
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            Image(
+                painter = rememberAsyncImagePainter(imageUrl),
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         Spacer(modifier = Modifier.height(6.dp))

@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.navigation.NavController
 import com.android.dacs3.R
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.TagWrapper
+import com.android.dacs3.data.model.TagAttributes
 import com.android.dacs3.presentations.components.MangaItem
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.viewmodel.MangaViewModel
@@ -38,8 +41,9 @@ fun ExploreScreen(
     val mangas by viewModel.mangas.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
-    val tags by viewModel.tags.collectAsState()
+    val firestoreTags by viewModel.firestoreTags.collectAsState()
     val selectedTags by viewModel.selectedTags.collectAsState()
+    val tagFilterMode by viewModel.tagFilterMode.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedTabIndex by remember { mutableStateOf(0) }
@@ -50,7 +54,18 @@ fun ExploreScreen(
     // Initialize data when screen is first displayed
     LaunchedEffect(Unit) {
         viewModel.loadReadingProgress()
-        viewModel.fetchTags()
+        viewModel.fetchTagsFromFirestore()
+    }
+
+    // Load appropriate data when tab changes
+    LaunchedEffect(selectedTabIndex) {
+        if (searchQuery.isBlank()) {
+            when (selectedTabIndex) {
+                0 -> viewModel.fetchMangaList(reset = true)
+                1 -> viewModel.fetchRecommendedManga(reset = true)
+                2 -> viewModel.fetchTrendingManga(reset = true)
+            }
+        }
     }
 
     Scaffold(
@@ -101,31 +116,39 @@ fun ExploreScreen(
                         }
                     }
 
+                    // Filter button
                     IconButton(onClick = { showTagFilter = !showTagFilter }) {
-                        val iconResId = if (showTagFilter) R.drawable.ic_filter_2 else R.drawable.ic_filter_1
                         Icon(
-                            painter = painterResource(id = iconResId),
-                            contentDescription = if (showTagFilter) "Close Filter" else "Open Filter",
-                            modifier = Modifier.size(24.dp),
-                            tint = Color.Black
+                            imageVector = Icons.Default.Home,  // Thêm biểu tượng FilterList
+                            contentDescription = "Filter",
+                            tint = if (selectedTags.isNotEmpty()) Color.Blue else Color.Gray
                         )
                     }
-
                 }
 
                 // Tag filter section
                 AnimatedVisibility(visible = showTagFilter) {
                     TagFilterSection(
-                        tags = tags,
-                        selectedTags = selectedTags,
-                        onTagSelected = { tagId, selected ->
-                            viewModel.updateSelectedTags(tagId, selected)
+                        tags = firestoreTags.map { tag ->
+                            TagWrapper(
+                                id = tag.id,
+                                type = "tag",
+                                attributes = TagAttributes(
+                                    name = mapOf("en" to tag.name),
+                                    group = tag.group,
+                                    description = emptyMap()
+                                )
+                            )
                         },
+                        selectedTags = selectedTags,
+                        onTagSelected = viewModel::updateSelectedTags,
                         onApplyFilter = {
                             viewModel.applyTagFilter()
                             showTagFilter = false
                         },
-                        onClearAllTags = {viewModel.clearAllTags()}
+                        onClearAllTags = viewModel::clearAllTags,
+                        tagFilterMode = tagFilterMode,
+                        onTagFilterModeChange = viewModel::setTagFilterMode
                     )
                 }
             }
@@ -164,7 +187,6 @@ fun ExploreScreen(
                         }
                     }
                 )
-
             }
         }
     }
@@ -216,7 +238,9 @@ fun TagFilterSection(
     selectedTags: List<String>,
     onTagSelected: (String, Boolean) -> Unit,
     onApplyFilter: () -> Unit,
-    onClearAllTags: () -> Unit
+    onClearAllTags: () -> Unit,
+    tagFilterMode: String,
+    onTagFilterModeChange: (String) -> Unit
 ) {
     // Group tags
     val groupedTags = tags.groupBy { it.attributes.group }

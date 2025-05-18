@@ -24,6 +24,10 @@ import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.DocumentSnapshot
+import kotlinx.coroutines.tasks.await
 
 @HiltViewModel
 class MangaViewModel @Inject constructor(
@@ -127,6 +131,13 @@ class MangaViewModel @Inject constructor(
     private val _chapterError = MutableStateFlow<String?>(null)
     val chapterError: StateFlow<String?> = _chapterError
 
+    // Thêm biến để theo dõi trạng thái tải dữ liệu từ Firestore
+    private val _isLoadingFromFirestore = MutableStateFlow(false)
+    val isLoadingFromFirestore: StateFlow<Boolean> = _isLoadingFromFirestore
+
+    private val _firestoreTags = MutableStateFlow<List<Tag>>(emptyList())
+    val firestoreTags: StateFlow<List<Tag>> = _firestoreTags
+
     init {
         fetchMangaList()
     }
@@ -137,31 +148,110 @@ class MangaViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                if (reset) {
-                    currentPage = 0
-                    _mangas.value = emptyList()
+                _isLoadingFromFirestore.value = true
+                _isRefreshing.value = true
+                
+                // Đảm bảo tags đã được tải
+                if (_firestoreTags.value.isEmpty()) {
+                    fetchTagsFromFirestore()
                 }
-
-                val result = repository.fetchMangaList(pageSize, currentPage * pageSize)
-                result.onSuccess {
-                    if (reset) {
-                        _mangas.value = it.data
-                    } else {
-                        _mangas.value = _mangas.value + it.data
+                
+                // Lấy tất cả dữ liệu từ Firestore
+                val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+                val query = mangaCollection.orderBy("lastUpdated", Query.Direction.DESCENDING)
+                
+                val querySnapshot = query.get().await()
+                
+                Log.d("MangaViewModel", "Fetched ${querySnapshot.documents.size} manga documents from Firestore")
+                
+                // Chuyển đổi dữ liệu Firestore thành MangaData
+                val mangaList = querySnapshot.documents.mapNotNull { document ->
+                    try {
+                        val id = document.id
+                        
+                        // Xử lý ảnh bìa - ưu tiên coverImageUrl
+                        val coverImageUrl = document.getString("coverImageUrl") ?: ""
+                        val coverUrl = document.getString("coverUrl") ?: ""
+                        
+                        // Xác định URL cuối cùng theo thứ tự ưu tiên
+                        val finalCoverUrl = when {
+                            // 1. Ưu tiên coverImageUrl nếu có
+                            coverImageUrl.isNotEmpty() -> coverImageUrl
+                            // 2. Thử coverUrl nếu có
+                            coverUrl.isNotEmpty() && coverUrl.startsWith("http") -> coverUrl
+                            // 3. Nếu không có cả hai, sử dụng placeholder
+                            else -> "https://via.placeholder.com/512x768?text=No+Cover"
+                        }
+                        
+                        // Xử lý tags
+                        val tagIds = document.get("tagIds") as? List<String> ?: emptyList()
+                        val tagMap = _firestoreTags.value.associateBy { it.id }
+                        
+                        // Chuyển đổi tagIds thành đối tượng Tag
+                        val tags = tagIds.mapNotNull { tagId ->
+                            tagMap[tagId]?.let { tag ->
+                                TagWrapper(
+                                    id = tag.id,
+                                    type = "tag",
+                                    attributes = TagAttributes(
+                                        name = mapOf("en" to tag.name),
+                                        group = tag.group,
+                                        description = emptyMap()
+                                    )
+                                )
+                            }
+                        }
+                        
+                        Log.d("MangaViewModel", "Manga $id has ${tags.size} tags")
+                        
+                        val description = document.getString("description") ?: ""
+                        val status = document.getString("status") ?: ""
+                        val title: Map<String, String> = (document.get("title") as? Map<String, String>) 
+                            ?: mapOf("en" to (document.getString("title") ?: "Unknown"))
+                        
+                        // Tạo đối tượng MangaData với tags
+                        MangaData(
+                            id = id,
+                            attributes = MangaAttributes(
+                                title = title,
+                                description = mapOf("en" to description),
+                                status = status,
+                                availableTranslatedLanguages = listOf("en"),
+                                altTitles = emptyList(),
+                                tags = tags
+                            ),
+                            relationships = listOf(
+                                Relationship(
+                                    id = id,
+                                    type = "cover_art",
+                                    attributes = RelationshipAttributes(
+                                        fileName = finalCoverUrl
+                                    )
+                                )
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.e("MangaViewModel", "Error parsing manga document: ${document.id}", e)
+                        null
                     }
-                    currentPage++
-                }.onFailure {
-                    Log.e("MangaViewModel", "Error fetching manga list", it)
                 }
-
+                
+                // Cập nhật danh sách manga
+                _mangas.value = mangaList
+                
+                Log.d("MangaViewModel", "Loaded ${mangaList.size} manga from Firestore")
+                
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error fetching manga from Firestore", e)
             } finally {
                 isLoading = false
-                if (reset) _isRefreshing.value = false
+                _isLoadingFromFirestore.value = false
+                _isRefreshing.value = false
             }
         }
     }
 
-    fun fetchTrendingManga(limit: Int = 21, offset: Int = -1, reset: Boolean = false) {
+    fun fetchTrendingManga(reset: Boolean = false) {
         if (isLoading) return
         isLoading = true
 
@@ -174,24 +264,16 @@ class MangaViewModel @Inject constructor(
                     _mangas.value = emptyList()
                 }
 
-                // Calculate actual offset
-                val actualOffset = if (offset >= 0) offset else trendingPage * limit
+                // Đảm bảo tags đã được tải
+                if (_firestoreTags.value.isEmpty()) {
+                    fetchTagsFromFirestore()
+                }
 
-                val result = repository.fetchTrendingManga(limit, actualOffset)
-                result.onSuccess { response ->
-                    // Append data instead of replacing
-                    _mangas.value = if (trendingPage == 0) {
-                        response.data
-                    } else {
-                        _mangas.value + response.data
-                    }
-
-                    // Increment page for next load
-                    trendingPage++
-
-                    Log.d("MangaViewModel", "Loaded trending manga page $trendingPage, total items: ${_mangas.value.size}")
+                repository.fetchTrendingMangaFromFirestore().onSuccess { mangaList ->
+                    _mangas.value = mangaList
+                    Log.d("MangaViewModel", "Loaded ${mangaList.size} trending manga from Firestore")
                 }.onFailure { exception ->
-                    Log.e("MangaViewModel", "Error fetching trending manga", exception)
+                    Log.e("MangaViewModel", "Error fetching trending manga from Firestore", exception)
                 }
             } finally {
                 isLoading = false
@@ -200,7 +282,7 @@ class MangaViewModel @Inject constructor(
         }
     }
 
-    fun fetchRecommendedManga(includedTagIds: List<String>? = null, limit: Int = 21, offset: Int = -1, reset: Boolean = false) {
+    fun fetchRecommendedManga(includedTagIds: List<String>? = null, reset: Boolean = false) {
         if (isLoading) return
         isLoading = true
 
@@ -216,40 +298,30 @@ class MangaViewModel @Inject constructor(
                 }
 
                 // If no tags provided, try to get tags from reading history
-                val tagsToUse = includedTagIds ?: currentRecommendedTags.takeIf { it.isNotEmpty() } ?: getRecommendedTagsFromHistory()
+                val tagsToUse = includedTagIds ?: currentRecommendedTags.takeIf { it.isNotEmpty() }
 
                 // Save current tags for future pagination
                 if (tagsToUse != currentRecommendedTags) {
-                    currentRecommendedTags = tagsToUse
+                    currentRecommendedTags = tagsToUse ?: emptyList()
                 }
 
-                if (tagsToUse.isEmpty()) {
-                    Log.d("MangaViewModel", "No tags available for recommendations, falling back to trending")
-                    isLoading = false
-                    _isRefreshing.value = false
-                    fetchTrendingManga(limit, offset, reset)
-                    return@launch
+                // Đảm bảo tags đã được tải
+                if (_firestoreTags.value.isEmpty()) {
+                    fetchTagsFromFirestore()
                 }
 
-                // Calculate actual offset
-                val actualOffset = if (offset >= 0) offset else recommendedPage * limit
+                // Lấy userId hiện tại
+                val userId = firebaseAuth.currentUser?.uid ?: ""
 
-                Log.d("MangaViewModel", "Fetching recommendations with tags: $tagsToUse, page: $recommendedPage, offset: $actualOffset")
-                val result = repository.fetchRecommendedManga(tagsToUse, limit, actualOffset)
-                result.onSuccess { response ->
-                    // Append data instead of replacing
-                    _mangas.value = if (recommendedPage == 0) {
-                        response.data
-                    } else {
-                        _mangas.value + response.data
-                    }
-
-                    // Increment page for next load
-                    recommendedPage++
-
-                    Log.d("MangaViewModel", "Loaded recommended manga page $recommendedPage, total items: ${_mangas.value.size}")
+                repository.fetchRecommendedMangaFromFirestore(
+                    userId = userId,
+                    includedTagIds = tagsToUse,
+                    limit = 20
+                ).onSuccess { mangaList ->
+                    _mangas.value = mangaList
+                    Log.d("MangaViewModel", "Loaded ${mangaList.size} recommended manga from Firestore")
                 }.onFailure { exception ->
-                    Log.e("MangaViewModel", "Error fetching recommended manga", exception)
+                    Log.e("MangaViewModel", "Error fetching recommended manga from Firestore", exception)
                 }
             } finally {
                 isLoading = false
@@ -328,11 +400,115 @@ class MangaViewModel @Inject constructor(
 
     fun searchManga(title: String) {
         viewModelScope.launch {
-            val result = repository.searchManga(title)
-            result.onSuccess {
-                _mangas.value = it.data
-            }.onFailure {
-                Log.e("MangaViewModel", "Error searching manga", it)
+            try {
+                _isLoadingFromFirestore.value = true
+                _isRefreshing.value = true
+                
+                // Đảm bảo tags đã được tải
+                if (_firestoreTags.value.isEmpty()) {
+                    fetchTagsFromFirestore()
+                    delay(500) // Đợi tags được tải
+                }
+                
+                // Lấy dữ liệu từ Firestore với filter theo title
+                val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+                
+                // Tìm kiếm case-insensitive với title
+                val querySnapshot = mangaCollection.get().await()
+                
+                Log.d("MangaViewModel", "Fetched ${querySnapshot.documents.size} manga documents for search")
+                
+                // Lọc thủ công vì Firestore không hỗ trợ tìm kiếm text đầy đủ
+                val searchTermLower = title.lowercase()
+                
+                // Chuyển đổi dữ liệu Firestore thành MangaData và lọc theo title
+                val mangaList = querySnapshot.documents.mapNotNull { document ->
+                    try {
+                        val id = document.id
+                        
+                        // Lấy title để kiểm tra match
+                        val mangaTitle: Map<String, String> = (document.get("title") as? Map<String, String>) 
+                            ?: mapOf("en" to (document.getString("title") ?: "Unknown"))
+                        
+                        // Kiểm tra xem title có chứa search term không
+                        val titleMatches = mangaTitle.values.any { 
+                            it.lowercase().contains(searchTermLower) 
+                        }
+                        
+                        // Nếu không match, bỏ qua document này
+                        if (!titleMatches) return@mapNotNull null
+                        
+                        // Xử lý ảnh bìa
+                        val coverImageUrl = document.getString("coverImageUrl") ?: ""
+                        val coverFileName = document.getString("coverFileName")
+                        
+                        var finalCoverUrl = coverImageUrl
+                        
+                        // Nếu coverImageUrl rỗng, thử tạo từ coverFileName
+                        if (finalCoverUrl.isEmpty() && !coverFileName.isNullOrEmpty()) {
+                            finalCoverUrl = "https://uploads.mangadex.org/covers/$id/$coverFileName.512.jpg"
+                        }
+                        
+                        // Xử lý tags
+                        val tagIds = document.get("tagIds") as? List<String> ?: emptyList()
+                        val tagMap = _firestoreTags.value.associateBy { it.id }
+                        
+                        // Chuyển đổi tagIds thành đối tượng TagWrapper
+                        val tags = tagIds.mapNotNull { tagId ->
+                            tagMap[tagId]?.let { tag ->
+                                TagWrapper(
+                                    id = tag.id,
+                                    type = "tag",
+                                    attributes = TagAttributes(
+                                        name = mapOf("en" to tag.name),
+                                        group = tag.group,
+                                        description = emptyMap()
+                                    )
+                                )
+                            }
+                        }
+                        
+                        val description = document.getString("description") ?: ""
+                        val status = document.getString("status") ?: ""
+                        
+                        // Tạo đối tượng MangaData với tags
+                        MangaData(
+                            id = id,
+                            attributes = MangaAttributes(
+                                title = mangaTitle,
+                                description = mapOf("en" to description),
+                                status = status,
+                                availableTranslatedLanguages = listOf("en"),
+                                altTitles = emptyList(),
+                                tags = tags
+                            ),
+                            relationships = listOf(
+                                Relationship(
+                                    id = id,
+                                    type = "cover_art",
+                                    attributes = RelationshipAttributes(
+                                        fileName = finalCoverUrl
+                                    )
+                                )
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.e("MangaViewModel", "Error parsing manga document: ${document.id}", e)
+                        null
+                    }
+                }
+                
+                // Cập nhật danh sách manga
+                _mangas.value = mangaList
+                
+                Log.d("MangaViewModel", "Found ${mangaList.size} manga matching search term: $title")
+                
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error searching manga", e)
+            } finally {
+                _isLoadingFromFirestore.value = false
+                _isRefreshing.value = false
+                isLoading = false
             }
         }
     }
@@ -344,42 +520,89 @@ class MangaViewModel @Inject constructor(
 
     fun loadMangaDetails(mangaId: String) {
         viewModelScope.launch {
-            val result = repository.getMangaById(mangaId)
-            result.onSuccess { response ->
-                if (response.data == null) {
+            try {
+                // Lấy dữ liệu manga từ Firestore
+                val mangaDoc = FirebaseFirestore.getInstance().collection("manga").document(mangaId).get().await()
+                
+                if (!mangaDoc.exists()) {
                     _mangaDetail.update { MangaDetailUiState(title = "Manga not found") }
-                    return@onSuccess
+                    return@launch
                 }
+                
+                // Đảm bảo tags đã được tải
+                if (_firestoreTags.value.isEmpty()) {
+                    fetchTagsFromFirestore()
+                    delay(500) // Đợi tags được tải
+                }
+                
+                // Xử lý ảnh bìa - ưu tiên coverImageUrl
+                val coverImageUrl = mangaDoc.getString("coverImageUrl") ?: ""
+                val coverUrl = mangaDoc.getString("coverUrl") ?: ""
+                val coverFileName = mangaDoc.getString("coverFileName") ?: ""
 
-                val attributes = response.data.attributes
-                val availableLanguages = attributes.availableTranslatedLanguages.distinct()
-                _availableLanguages.value = availableLanguages
-
-                val selectedTitle = attributes.title[_selectedLanguage.value]
-                    ?: attributes.altTitles.firstOrNull { it[_selectedLanguage.value] != null }?.get(_selectedLanguage.value)
-                    ?: attributes.title["en"]
-                    ?: attributes.altTitles.firstOrNull { it["en"] != null }?.get("en")
-                    ?: "No title available"
-
-                val rawDescription = attributes.description[_selectedLanguage.value]
-                    ?: attributes.description["en"]
-                    ?: "No description available"
-                val selectedDescription = rawDescription.split("---")[0].trim()
-
+                // Xác định URL cuối cùng theo thứ tự ưu tiên
+                val finalCoverUrl = when {
+                    // 1. Ưu tiên coverImageUrl nếu có
+                    coverImageUrl.isNotEmpty() -> coverImageUrl
+                    // 2. Thử coverUrl nếu có
+                    coverUrl.isNotEmpty() && coverUrl.startsWith("http") -> coverUrl
+                    // 3. Nếu không có cả hai, sử dụng placeholder
+                    else -> "https://via.placeholder.com/512x768?text=No+Cover"
+                }
+                
+                // Xử lý tags
+                val tagIds = mangaDoc.get("tagIds") as? List<String> ?: emptyList()
+                val tagMap = _firestoreTags.value.associateBy { it.id }
+                
+                // Chuyển đổi tagIds thành đối tượng Tag
+                val tags = tagIds.mapNotNull { tagId ->
+                    tagMap[tagId]?.let { tag ->
+                        TagWrapper(
+                            id = tag.id,
+                            type = "tag",
+                            attributes = TagAttributes(
+                                name = mapOf("en" to tag.name),
+                                group = tag.group,
+                                description = emptyMap()
+                            )
+                        )
+                    }
+                }
+                
+                // Lấy thông tin cơ bản
+                val description = mangaDoc.getString("description") ?: "No description available"
+                val status = mangaDoc.getString("status") ?: "Unknown"
+                val title: Map<String, String> = (mangaDoc.get("title") as? Map<String, String>) 
+                    ?: mapOf("en" to (mangaDoc.getString("title") ?: "Unknown"))
+                val author = mangaDoc.getString("author") ?: "Unknown"
+                
+                // Lấy danh sách ngôn ngữ có sẵn
+                val availableLanguages = mangaDoc.get("availableLanguages") as? List<String> ?: listOf("en")
+                _availableLanguages.value = availableLanguages.distinct()
+                
+                // Chọn tiêu đề phù hợp với ngôn ngữ đã chọn
+                val selectedTitle = title[_selectedLanguage.value] ?: title["en"] ?: "No title available"
+                
+                // Cập nhật UI state
                 _mangaDetail.update {
                     MangaDetailUiState(
                         title = selectedTitle,
-                        description = selectedDescription,
-                        status = attributes.status ?: "Unknown",
-                        author = response.data.relationships.firstOrNull { it.type == "author" }?.attributes?.name.orEmpty(),
-                        coverImageUrl = buildCoverUrl(response),
-                        genres = extractGenres(response),
-                        titles = attributes.title,
-                        descriptions = attributes.description
+                        description = description,
+                        status = status,
+                        author = author,
+                        coverImageUrl = finalCoverUrl,
+                        genres = tags.map { tag ->
+                            tag.attributes.name["en"] ?: "Unknown"
+                        },
+                        titles = title,
+                        descriptions = mapOf("en" to description)
                     )
                 }
-            }.onFailure {
-                Log.e("MangaViewModel", "Error loading manga details", it)
+                
+                Log.d("MangaViewModel", "Loaded manga details for $mangaId from Firestore")
+                
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Error loading manga details from Firestore", e)
                 _mangaDetail.update { MangaDetailUiState(title = "Error loading manga details") }
             }
         }
@@ -402,55 +625,68 @@ class MangaViewModel @Inject constructor(
 
     fun loadChapters(mangaId: String, language: String) {
         viewModelScope.launch {
-            val allChapters = mutableListOf<ChapterData>()
-            var offset = 0
-            val limit = 100
-            var hasMore = true
-
-            while (hasMore) {
-                val result = repository.getMangaChapters(mangaId, language, limit, offset)
-                result.onSuccess { newChapters ->
-                    allChapters.addAll(newChapters)
-                    hasMore = newChapters.isNotEmpty()
-                    offset += limit
-                }.onFailure {
-                    Log.e("MangaViewModel", "Error loading chapters", it)
-                    hasMore = false
+            try {
+                Log.d("MangaViewModel", "Starting to load chapters for manga $mangaId with language $language")
+                
+                repository.getChaptersFromFirestore(mangaId, language).onSuccess { chaptersList ->
+                    _chapters.value = chaptersList
+                    Log.d("MangaViewModel", "Successfully loaded ${chaptersList.size} chapters for manga $mangaId")
+                    
+                    // Log chi tiết về 3 chapter đầu tiên (nếu có)
+                    chaptersList.take(3).forEachIndexed { index, chapter ->
+                        Log.d("MangaViewModel", "Chapter ${index + 1}: id=${chapter.id}, number=${chapter.attributes.chapter}, title=${chapter.attributes.title}")
+                    }
+                }.onFailure { exception ->
+                    Log.e("MangaViewModel", "Error loading chapters", exception)
+                    _chapters.value = emptyList()
                 }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Unexpected error loading chapters", e)
+                _chapters.value = emptyList()
             }
-
-            _chapters.value = allChapters
         }
     }
 
     fun loadChapterContent(chapterId: String) {
         viewModelScope.launch {
             try {
+                Log.d("MangaViewModel", "Starting to load content for chapter $chapterId")
+                
                 _chapterError.value = null
                 _chapterImageUrls.value = emptyList()
                 _totalPages.value = 0
                 _currentPageReading.value = 1
 
-                val result = repository.getChapterContent(chapterId)
-                result.onSuccess { response ->
-                    val baseUrl = response.baseUrl
-                    val hash = response.chapter.hash
-                    val imageUrls = response.chapter.data.map { "$baseUrl/data/$hash/$it" }
-
-                    _chapterImageUrls.value = imageUrls
-                    _totalPages.value = imageUrls.size
+                repository.getChapterContentFromFirestore(chapterId).onSuccess { (title, urls) ->
+                    _chapterImageUrls.value = urls
+                    _totalPages.value = urls.size
                     _currentPageReading.value = 1
-
-                    // Get chapter title
-                    val chapter = _chapters.value.find { it.id == chapterId }
-                    _chapterTitle.value = chapter?.attributes?.title ?: "Chapter"
-                }.onFailure {
-                    _chapterError.value = "Failed to load chapter content"
-                    Log.e("MangaViewModel", "Error loading chapter content", it)
+                    _chapterTitle.value = title
+                    
+                    Log.d("MangaViewModel", "Successfully loaded chapter content: title=$title, ${urls.size} images")
+                    
+                    // Log một số URL hình ảnh đầu tiên (nếu có)
+                    urls.take(2).forEachIndexed { index, url ->
+                        Log.d("MangaViewModel", "Image ${index + 1}: $url")
+                    }
+                    
+                    // Đánh dấu chapter đã đọc
+                    val currentUser = firebaseAuth.currentUser
+                    if (currentUser != null) {
+                        Log.d("MangaViewModel", "Marking chapter $chapterId as read")
+                        
+                        // Cập nhật danh sách chapter đã đọc
+                        _readChapters.update { currentSet ->
+                            currentSet + chapterId
+                        }
+                    }
+                }.onFailure { exception ->
+                    _chapterError.value = exception.message ?: "Failed to load chapter content"
+                    Log.e("MangaViewModel", "Error loading chapter content: ${exception.message}", exception)
                 }
             } catch (e: Exception) {
                 _chapterError.value = "An unexpected error occurred"
-                Log.e("MangaViewModel", "Error loading chapter content", e)
+                Log.e("MangaViewModel", "Unexpected error loading chapter content", e)
             }
         }
     }
@@ -471,53 +707,45 @@ class MangaViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                Log.d("MangaViewModel", "Starting to load next chapter after $currentChapterId in manga $mangaId")
+                
                 _isLoadingNextChapter.value = true
                 _showNextChapterButton.value = false
                 _chapterError.value = null
 
-                // Load chapters if not already loaded
-                if (_chapters.value.isEmpty()) {
-                    loadChapters(mangaId, language)
-                    // Wait for chapters to load with timeout
-                    var attempts = 0
-                    while (_chapters.value.isEmpty() && attempts < 50) {
-                        delay(100)
-                        attempts++
-                    }
-                    if (_chapters.value.isEmpty()) {
-                        _chapterError.value = "Failed to load chapters"
+                repository.getNextChapterFromFirestore(mangaId, currentChapterId, language).onSuccess { nextChapter ->
+                    if (nextChapter != null) {
+                        Log.d("MangaViewModel", "Found next chapter: ${nextChapter.id}, number: ${nextChapter.attributes.chapter}")
+                        
+                        // Save reading progress for current chapter
+                        saveReadingProgress(
+                            mangaId = mangaId,
+                            chapterId = currentChapterId,
+                            language = language,
+                            lastPageIndex = _totalPages.value
+                        )
+
+                        // Clear current chapter data
+                        _chapterImageUrls.value = emptyList()
+                        _totalPages.value = 0
+                        _currentPageReading.value = 1  // Reset to page 1
+                        _chapterTitle.value = ""
+                        
+                        // Notify UI to reload with next chapter
+                        onChapterLoaded(nextChapter.id)
+                    } else {
+                        Log.d("MangaViewModel", "No next chapter available after $currentChapterId")
+                        _chapterError.value = "No next chapter available"
                         onChapterLoaded(null)
-                        return@launch
                     }
-                }
-
-                val currentIndex = _chapters.value.indexOfFirst { it.id == currentChapterId }
-                if (currentIndex != -1 && currentIndex < _chapters.value.size - 1) {
-                    val nextChapter = _chapters.value[currentIndex + 1]
-                    
-                    // Save reading progress for current chapter
-                    saveReadingProgress(
-                        mangaId = mangaId,
-                        chapterId = currentChapterId,
-                        language = language,
-                        lastPageIndex = _totalPages.value
-                    )
-
-                    // Clear current chapter data
-                    _chapterImageUrls.value = emptyList()
-                    _totalPages.value = 0
-                    _currentPageReading.value = 1  // Reset to page 1
-                    _chapterTitle.value = ""
-                    
-                    // Notify UI to reload with next chapter
-                    // Thêm thông tin rõ ràng rằng nên bắt đầu từ trang 0
-                    onChapterLoaded(nextChapter.id)
-                } else {
+                }.onFailure { exception ->
+                    _chapterError.value = "Failed to load next chapter"
+                    Log.e("MangaViewModel", "Error loading next chapter", exception)
                     onChapterLoaded(null)
                 }
             } catch (e: Exception) {
                 _chapterError.value = "Failed to load next chapter"
-                Log.e("MangaViewModel", "Error loading next chapter", e)
+                Log.e("MangaViewModel", "Unexpected error loading next chapter", e)
                 onChapterLoaded(null)
             } finally {
                 _isLoadingNextChapter.value = false
@@ -548,14 +776,24 @@ class MangaViewModel @Inject constructor(
 
     fun getLastReadChapter(mangaId: String, language: String) {
         val userId = firebaseAuth.currentUser?.uid ?: return
+        
         viewModelScope.launch {
-            val result = repository.getLastReadChapter(userId, mangaId, language)
-            result.onSuccess { (chapterId, lastPageIndex) ->
-                _lastReadChapter.value = Pair(chapterId, lastPageIndex)
-                Log.d("MangaViewModel", "Last read chapter: $chapterId, page: $lastPageIndex")
-            }
-            result.onFailure {
-                Log.e("MangaViewModel", "Failed to get last read chapter", it)
+            try {
+                Log.d("MangaViewModel", "Getting last read chapter for manga $mangaId with language $language")
+                
+                repository.getLastReadChapter(userId, mangaId, language).onSuccess { result ->
+                    if (result != null) {
+                        val (chapterId, lastPageIndex) = result
+                        _lastReadChapter.value = Pair(chapterId, lastPageIndex)
+                        Log.d("MangaViewModel", "Found last read chapter: $chapterId, page: $lastPageIndex")
+                    } else {
+                        Log.d("MangaViewModel", "No last read chapter found for manga $mangaId")
+                    }
+                }.onFailure { exception ->
+                    Log.e("MangaViewModel", "Error getting last read chapter", exception)
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Unexpected error getting last read chapter", e)
             }
         }
     }
@@ -806,19 +1044,102 @@ class MangaViewModel @Inject constructor(
         } else {
             viewModelScope.launch {
                 try {
-                    val result = repository.getMangaByTags(
-                        includedTags = _selectedTags.value,
-                        includedTagsMode = _tagFilterMode.value,
-                        limit = pageSize,
-                        offset = 0
-                    )
-                    result.onSuccess { response ->
-                        _mangas.value = response.data
-                    }.onFailure { e ->
-                        Log.e("MangaViewModel", "Error applying tag filter", e)
+                    _isLoadingFromFirestore.value = true
+                    _isRefreshing.value = true
+                    
+                    // Đảm bảo tags đã được tải
+                    if (_firestoreTags.value.isEmpty()) {
+                        fetchTagsFromFirestore()
+                        delay(500) // Đợi tags được tải
                     }
+                    
+                    // Lấy dữ liệu từ Firestore với filter
+                    val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+                    
+                    // Sử dụng whereArrayContainsAny để lấy manga có ít nhất một trong các tag đã chọn
+                    val query = mangaCollection.whereArrayContainsAny("tagIds", _selectedTags.value)
+                    
+                    val querySnapshot = query.get().await()
+                    
+                    Log.d("MangaViewModel", "Fetched ${querySnapshot.documents.size} manga documents for tag filtering")
+                    
+                    // Chuyển đổi dữ liệu Firestore thành MangaData
+                    val mangaList = querySnapshot.documents.mapNotNull { document ->
+                        try {
+                            val id = document.id
+                            
+                            // Xử lý ảnh bìa
+                            val coverImageUrl = document.getString("coverImageUrl") ?: ""
+                            val coverFileName = document.getString("coverFileName")
+                            
+                            var finalCoverUrl = coverImageUrl
+                            
+                            // Nếu coverImageUrl rỗng, thử tạo từ coverFileName
+                            if (finalCoverUrl.isEmpty() && !coverFileName.isNullOrEmpty()) {
+                                finalCoverUrl = "https://uploads.mangadex.org/covers/$id/$coverFileName.512.jpg"
+                            }
+                            
+                            // Xử lý tags
+                            val tagIds = document.get("tagIds") as? List<String> ?: emptyList()
+                            val tagMap = _firestoreTags.value.associateBy { it.id }
+                            
+                            // Chuyển đổi tagIds thành đối tượng TagWrapper
+                            val tags = tagIds.mapNotNull { tagId ->
+                                tagMap[tagId]?.let { tag ->
+                                    TagWrapper(
+                                        id = tag.id,
+                                        type = "tag",
+                                        attributes = TagAttributes(
+                                            name = mapOf("en" to tag.name),
+                                            group = tag.group,
+                                            description = emptyMap()
+                                        ))
+                                }
+                            }
+                            
+                            val description = document.getString("description") ?: ""
+                            val status = document.getString("status") ?: ""
+                            val title: Map<String, String> = (document.get("title") as? Map<String, String>) 
+                                ?: mapOf("en" to (document.getString("title") ?: "Unknown"))
+                            
+                            // Tạo đối tượng MangaData với tags
+                            MangaData(
+                                id = id,
+                                attributes = MangaAttributes(
+                                    title = title,
+                                    description = mapOf("en" to description),
+                                    status = status,
+                                    availableTranslatedLanguages = listOf("en"),
+                                    altTitles = emptyList(),
+                                    tags = tags
+                                ),
+                                relationships = listOf(
+                                    Relationship(
+                                        id = id,
+                                        type = "cover_art",
+                                        attributes = RelationshipAttributes(
+                                            fileName = finalCoverUrl
+                                        )
+                                    )
+                                )
+                            )
+                        } catch (e: Exception) {
+                            Log.e("MangaViewModel", "Error parsing manga document: ${document.id}", e)
+                            null
+                        }
+                    }
+                    
+                    // Cập nhật danh sách manga
+                    _mangas.value = mangaList
+                    
+                    Log.d("MangaViewModel", "Filtered to ${mangaList.size} manga based on tags")
+                    
                 } catch (e: Exception) {
-                    Log.e("MangaViewModel", "Unexpected error in applyTagFilter", e)
+                    Log.e("MangaViewModel", "Error applying tag filter", e)
+                } finally {
+                    _isLoadingFromFirestore.value = false
+                    _isRefreshing.value = false
+                    isLoading = false
                 }
             }
         }
@@ -953,14 +1274,24 @@ class MangaViewModel @Inject constructor(
     // Add a function to load read chapters for a manga
     fun loadReadChapters(mangaId: String, language: String) {
         val userId = firebaseAuth.currentUser?.uid ?: return
+        
         viewModelScope.launch {
             try {
-                val result = repository.getReadChapters(userId, mangaId, language)
-                result.onSuccess { chapters ->
-                    _readChapters.value = chapters.toSet()
+                Log.d("MangaViewModel", "Loading read chapters for manga $mangaId with language $language")
+                
+                repository.getReadChapters(userId, mangaId, language).onSuccess { readChapterIds ->
+                    _readChapters.value = readChapterIds.toSet()
+                    Log.d("MangaViewModel", "Successfully loaded ${readChapterIds.size} read chapters for manga $mangaId")
+                    
+                    // Log một số chapter đã đọc (nếu có)
+                    readChapterIds.take(3).forEach { chapterId ->
+                        Log.d("MangaViewModel", "Read chapter: $chapterId")
+                    }
+                }.onFailure { exception ->
+                    Log.e("MangaViewModel", "Error loading read chapters", exception)
                 }
             } catch (e: Exception) {
-                Log.e("MangaViewModel", "Error loading read chapters", e)
+                Log.e("MangaViewModel", "Unexpected error loading read chapters", e)
             }
         }
     }
@@ -980,6 +1311,29 @@ class MangaViewModel @Inject constructor(
 
     fun clearChapterError() {
         _chapterError.value = null
+    }
+
+    fun fetchTagsFromFirestore() {
+        viewModelScope.launch {
+            try {
+                repository.getTagsFromFirestore().onSuccess { tagList ->
+                    _firestoreTags.value = tagList
+                    Log.d("MangaViewModel", "Fetched ${tagList.size} tags from Firestore")
+                    
+                    // Log chi tiết về tags
+                    tagList.groupBy { it.group }.forEach { (group, tagsInGroup) ->
+                        Log.d("MangaViewModel", "Group: $group - ${tagsInGroup.size} tags")
+                        tagsInGroup.take(5).forEach { tag ->
+                            Log.d("MangaViewModel", "  - ${tag.id}: ${tag.name}")
+                        }
+                    }
+                }.onFailure { e ->
+                    Log.e("MangaViewModel", "Error fetching tags from Firestore", e)
+                }
+            } catch (e: Exception) {
+                Log.e("MangaViewModel", "Unexpected error in fetchTagsFromFirestore", e)
+            }
+        }
     }
 }
 

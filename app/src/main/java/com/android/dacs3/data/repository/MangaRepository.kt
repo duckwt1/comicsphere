@@ -3,9 +3,11 @@ package com.android.dacs3.data.repository
 import com.android.dacs3.data.model.ChapterContentResponse
 import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.Comment
+import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.data.model.MangaDetailResponse
 import com.android.dacs3.data.model.MangaListResponse
 import com.android.dacs3.data.model.ReadingProgress
+import com.android.dacs3.data.model.Tag
 import com.android.dacs3.data.model.TagWrapper
 import com.android.dacs3.data.model.User
 
@@ -29,11 +31,6 @@ interface MangaRepository {
         lastPageIndex: Int
     ): Result<Boolean>
 
-    suspend fun getLastReadChapter(
-        userId: String,
-        mangaId: String,
-        language: String
-    ): Result<Pair<String, Int>>
 
     suspend fun getReadingProgress(userId: String): Result<List<ReadingProgress>>
 
@@ -88,4 +85,22 @@ interface MangaRepository {
         mangaId: String,
         language: String
     ): Result<List<String>>
+
+    suspend fun getTagsFromFirestore(): Result<List<Tag>>
+
+    suspend fun fetchTrendingMangaFromFirestore(limit: Int = 20): Result<List<MangaData>>
+
+    suspend fun fetchRecommendedMangaFromFirestore(
+        userId: String,
+        includedTagIds: List<String>? = null,
+        limit: Int = 20
+    ): Result<List<MangaData>>
+
+    suspend fun getChaptersFromFirestore(mangaId: String, language: String): Result<List<ChapterData>>
+
+    suspend fun getChapterContentFromFirestore(chapterId: String): Result<Pair<String, List<String>>>
+
+    suspend fun getNextChapterFromFirestore(mangaId: String, currentChapterId: String, language: String): Result<ChapterData?>
+
+    suspend fun getLastReadChapter(userId: String, mangaId: String, language: String): Result<Pair<String, Int>?>
 }

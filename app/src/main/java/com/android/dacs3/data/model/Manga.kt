@@ -1,5 +1,7 @@
 package com.android.dacs3.data.model
 
+import android.util.Log
+
 data class MangaListResponse(
     val result: String,
     val data: List<MangaData>
@@ -53,4 +55,28 @@ val MangaData.coverImageUrl: String?
         val coverArt = relationships.find { it.type == "cover_art" }
         val fileName = coverArt?.attributes?.fileName
         return fileName?.let { "https://uploads.mangadex.org/covers/$id/$it.512.jpg" }
+    }
+
+val MangaData.directCoverImageUrl: String?
+    get() {
+        val coverArt = relationships.find { it.type == "cover_art" }
+        val fileName = coverArt?.attributes?.fileName
+        Log.d("MangaModel", "directCoverImageUrl for manga $id: $fileName")
+        return fileName
+    }
+
+// Cập nhật extension property để lấy URL hiển thị
+val MangaData.displayCoverUrl: String
+    get() {
+        // Lấy coverUrl từ relationships
+        val coverArt = relationships.find { it.type == "cover_art" }
+        val coverUrl = coverArt?.attributes?.fileName ?: ""
+        
+        // Nếu có coverUrl và là URL đầy đủ, sử dụng trực tiếp
+        if (coverUrl.isNotEmpty() && coverUrl.startsWith("http")) {
+            return coverUrl
+        }
+        
+        // Nếu không có URL hợp lệ, sử dụng placeholder
+        return "https://via.placeholder.com/512x768?text=No+Cover"
     }
