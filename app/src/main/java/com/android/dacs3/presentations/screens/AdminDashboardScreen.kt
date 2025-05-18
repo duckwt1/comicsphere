@@ -1,5 +1,7 @@
 package com.android.dacs3.presentations.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,9 +19,25 @@ import androidx.navigation.NavController
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
 import android.util.Log
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import com.android.dacs3.utliz.AdminConfig
 import com.google.firebase.auth.FirebaseAuth
+
+// Define black and white theme colors - same as in AdminUserManagementScreen
+private val BlackWhiteTheme = object {
+    val primary = Color.Black
+    val onPrimary = Color.White
+    val background = Color.White
+    val surface = Color.White
+    val onSurface = Color.Black
+    val border = Color.Black
+    val divider = Color.LightGray
+    val iconTint = Color.Black
+    val vipIndicator = Color.Black
+    val adminIndicator = Color.Black
+    val error = Color.Black
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,14 +46,14 @@ fun AdminDashboardScreen(
     authViewModel: AuthViewModel
 ) {
     val context = LocalContext.current
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Admin Dashboard") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF2C3E50),
-                    titleContentColor = Color.White
+                    containerColor = BlackWhiteTheme.primary,
+                    titleContentColor = BlackWhiteTheme.onPrimary
                 ),
                 actions = {
                     IconButton(onClick = {
@@ -47,7 +65,7 @@ fun AdminDashboardScreen(
                         Icon(
                             imageVector = Icons.Default.ExitToApp,
                             contentDescription = "Logout",
-                            tint = Color.White
+                            tint = BlackWhiteTheme.onPrimary
                         )
                     }
                 }
@@ -57,6 +75,7 @@ fun AdminDashboardScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(BlackWhiteTheme.background)
                 .padding(innerPadding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -65,11 +84,11 @@ fun AdminDashboardScreen(
                 text = "Welcome, Admin",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2C3E50)
+                color = BlackWhiteTheme.onSurface
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             val adminFeatures = listOf(
                 AdminFeature(
                     title = "User Management",
@@ -92,7 +111,7 @@ fun AdminDashboardScreen(
                     route = Screens.AdminSettingsScreen.route
                 )
             )
-            
+
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -119,8 +138,10 @@ fun AdminFeatureCard(
             .height(100.dp),
         onClick = onClick,
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF5F5F5)
-        )
+            containerColor = BlackWhiteTheme.surface
+        ),
+        border = BorderStroke(1.dp, BlackWhiteTheme.border),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             modifier = Modifier
@@ -131,7 +152,7 @@ fun AdminFeatureCard(
             Icon(
                 imageVector = feature.icon,
                 contentDescription = null,
-                tint = Color(0xFF2C3E50),
+                tint = BlackWhiteTheme.iconTint,
                 modifier = Modifier.size(32.dp)
             )
 
@@ -140,7 +161,8 @@ fun AdminFeatureCard(
             Text(
                 text = feature.title,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                color = BlackWhiteTheme.onSurface
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -148,7 +170,7 @@ fun AdminFeatureCard(
             Icon(
                 imageVector = Icons.Default.ArrowForward,
                 contentDescription = null,
-                tint = Color(0xFF2C3E50)
+                tint = BlackWhiteTheme.iconTint
             )
         }
     }
@@ -159,6 +181,3 @@ data class AdminFeature(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val route: String
 )
-
-
-

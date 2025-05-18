@@ -99,8 +99,7 @@ fun AppNavGraph(navController: NavHostController) {
         }
 
         composable(Screens.AdminUserManagementScreen.route) {
-            // Implement later
-            Text("User Management Screen")
+            AdminUserManagementScreen(navController = navController)
         }
 
         composable(Screens.AdminMangaManagementScreen.route) {

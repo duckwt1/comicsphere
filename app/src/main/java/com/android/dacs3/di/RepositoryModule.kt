@@ -51,4 +51,9 @@ abstract class RepositoryModule {
         zaloPayRepositoryImpl: ZaloPayRepositoryImpl
     ): ZaloPayRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindAdminRepository(
+        adminRepositoryImpl: com.android.dacs3.data.repositoryimpl.AdminRepositoryImpl
+    ): com.android.dacs3.data.repository.AdminRepository
 }
