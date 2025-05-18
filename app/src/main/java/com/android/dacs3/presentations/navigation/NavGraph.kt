@@ -1,5 +1,6 @@
 package com.android.dacs3.presentations.navigation
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -92,7 +93,29 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(Screens.AdminDashboardScreen.route) {
+            val viewModel: AuthViewModel = hiltViewModel()
+            AdminDashboardScreen(navController = navController, authViewModel = viewModel)
+        }
 
+        composable(Screens.AdminUserManagementScreen.route) {
+            // Implement later
+            Text("User Management Screen")
+        }
 
+        composable(Screens.AdminMangaManagementScreen.route) {
+            // Implement later
+            Text("Manga Management Screen")
+        }
+
+        composable(Screens.AdminStatisticsScreen.route) {
+            // Implement later
+            Text("Statistics Screen")
+        }
+
+        composable(Screens.AdminSettingsScreen.route) {
+            // Implement later
+            Text("Admin Settings Screen")
+        }
     }
 }

@@ -17,7 +17,9 @@ class AuthRepositoryImpl @Inject constructor(
 ) : AuthRepository {
     override suspend fun login(username: String, password: String): Result<Boolean> {
         return try {
-            firebaseAuth.signInWithEmailAndPassword(username, password).await()
+            // Trim email để loại bỏ khoảng trắng thừa
+            val trimmedEmail = username.trim()
+            firebaseAuth.signInWithEmailAndPassword(trimmedEmail, password).await()
             Result.success(true)
         } catch (e: Exception) {
             Result.failure(e)
@@ -71,6 +73,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val avatar = document.getString("avatar") ?: ""
                 val createdAt = document.getTimestamp("createdAt")
                 val isVip = document.getBoolean("isVip") ?: false
+                val isAdmin = document.getBoolean("isAdmin") ?: false
                 
                 // Xử lý vipExpireDate có thể là Timestamp hoặc Long
                 val vipExpireDate = when (val expireDate = document.get("vipExpireDate")) {
@@ -80,14 +83,14 @@ class AuthRepositoryImpl @Inject constructor(
                 }
                 
                 val user = User(
-                    uid = uid,
                     email = email,
                     fullname = fullname,
                     nickname = nickname,
                     avatar = avatar,
                     createdAt = createdAt,
                     isVip = isVip,
-                    vipExpireDate = vipExpireDate
+                    vipExpireDate = vipExpireDate,
+                    isAdmin = isAdmin,
                 )
                 
                 Result.success(user)

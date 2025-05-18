@@ -21,6 +21,7 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import android.content.Context
 import com.android.dacs3.R
+import com.android.dacs3.utliz.AdminConfig
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
@@ -62,22 +63,47 @@ class AuthViewModel @Inject constructor(
         loadCurrentUser()
     }
 
-    private fun loadCurrentUser() {
+    // Thêm kiểm tra admin khi load user
+    fun checkAdminStatus() {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            val email = currentUser.email
+            if (email == AdminConfig.ADMIN_EMAIL) {
+                // Cập nhật trạng thái admin trong Firestore nếu cần
+                FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(currentUser.uid)
+                    .update("isAdmin", true)
+            }
+        }
+    }
+
+    fun loadCurrentUser() {
         val firebaseUser = FirebaseAuth.getInstance().currentUser
         if (firebaseUser != null) {
+            isLoading = true
             viewModelScope.launch {
-                isLoading = true
                 try {
                     authRepository.getUserInfo(firebaseUser.uid)
                         .onSuccess { user ->
                             currentUser = user
-                            Log.d("AuthViewModel", "User info loaded: $user")
+                            // Kiểm tra nếu email trùng với admin email
+                            if (user.email == AdminConfig.ADMIN_EMAIL) {
+                                // Cập nhật trạng thái admin
+                                FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(firebaseUser.uid)
+                                    .update("isAdmin", true)
+                                    .addOnSuccessListener {
+                                        currentUser = currentUser?.copy(isAdmin = true)
+                                    }
+                            }
                         }
                         .onFailure { e ->
-                            loginState = e.message ?: "Failed to load user info"
+                            loginState = e.message ?: "Failed to load user data"
                         }
                 } catch (e: Exception) {
-                    loginState = e.message ?: "An unexpected error occurred"
+                    loginState = e.message ?: "An error occurred"
                 } finally {
                     isLoading = false
                 }
@@ -132,7 +158,42 @@ class AuthViewModel @Inject constructor(
                 loginState = "Please enter all fields"
                 return@launch
             }
+            
+            // Kiểm tra định dạng email
+            if (!isValidEmail(username)) {
+                loginState = "Invalid email format"
+                return@launch
+            }
 
+            // Kiểm tra xem có phải admin không
+            if (username == AdminConfig.ADMIN_EMAIL && password == AdminConfig.ADMIN_PASSWORD) {
+                // Đăng nhập với tài khoản admin
+                val result = authRepository.login(username, password)
+                if (result.isSuccess) {
+                    loginState = "Admin login successful"
+                    isLoginSuccessful = true
+                    sessionManager.saveLoginState(true)
+                    
+                    // Cập nhật trạng thái admin trong Firestore
+                    val firebaseUser = FirebaseAuth.getInstance().currentUser
+                    if (firebaseUser != null) {
+                        FirebaseFirestore.getInstance()
+                            .collection("users")
+                            .document(firebaseUser.uid)
+                            .update("isAdmin", true)
+                            .addOnSuccessListener {
+                                // Tải lại thông tin người dùng để cập nhật isAdmin
+                                loadCurrentUser()
+                            }
+                    }
+                } else {
+                    loginState = result.exceptionOrNull()?.message ?: "Admin login failed"
+                    isLoginSuccessful = false
+                }
+                return@launch
+            }
+
+            // Đăng nhập thông thường
             val result = authRepository.login(username, password)
             if (result.isSuccess) {
                 loginState = "Login successful"
@@ -302,5 +363,11 @@ class AuthViewModel @Inject constructor(
                 isLoading = false
             }
         }
+    }
+
+    // Hàm kiểm tra email hợp lệ
+    private fun isValidEmail(email: String): Boolean {
+        val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$")
+        return emailRegex.matches(email)
     }
 }

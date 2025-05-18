@@ -1,6 +1,7 @@
 package com.android.dacs3.presentations.screens
 
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Face
@@ -40,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import com.android.dacs3.presentations.components.StyledTextField
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
+import com.android.dacs3.utliz.AdminConfig
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.AuthViewModel
 
@@ -117,6 +120,12 @@ private fun ProfileContent(
     imagePicker: androidx.activity.result.ActivityResultLauncher<String>,
     navController: NavController
 ) {
+    // Log để debug
+    Log.d("ProfileScreen", "Current user: ${viewModel.currentUser}")
+    Log.d("ProfileScreen", "Is admin: ${viewModel.currentUser?.isAdmin}")
+    Log.d("ProfileScreen", "Email: ${viewModel.currentUser?.email}")
+    Log.d("ProfileScreen", "Admin email: ${AdminConfig.ADMIN_EMAIL}")
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -162,6 +171,15 @@ private fun ProfileContent(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Admin Dashboard Button (chỉ hiển thị nếu là admin)
+        if (viewModel.currentUser?.isAdmin == true || viewModel.currentUser?.email == AdminConfig.ADMIN_EMAIL) {
+            Log.d("ProfileScreen", "Showing admin button")
+            AdminDashboardButton(navController = navController)
+            Spacer(modifier = Modifier.height(24.dp))
+        } else {
+            Log.d("ProfileScreen", "Not showing admin button")
+        }
 
         // Logout button
         LogoutButton(
@@ -579,6 +597,44 @@ private fun VipButton(isVip: Boolean, navController: NavController) {
 
             Text(
                 text = if (isVip) "Manage VIP Membership" else "Become VIP Member",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminDashboardButton(navController: NavController) {
+    Button(
+        onClick = { navController.navigate(Screens.AdminDashboardScreen.route) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF2C3E50),
+            contentColor = Color.White
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Admin Dashboard Icon",
+                tint = Color.White
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "Admin Dashboard",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )

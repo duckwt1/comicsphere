@@ -24,4 +24,11 @@ sealed class Screens(val route: String) {
     object NotificationsScreen : Screens("notifications_screen")
     object EditProfileScreen : Screens("edit_profile_screen")
     object HelpScreen : Screens("help_screen")
+
+    // Admin routes
+    object AdminDashboardScreen : Screens("admin_dashboard")
+    object AdminUserManagementScreen : Screens("admin_user_management")
+    object AdminMangaManagementScreen : Screens("admin_manga_management")
+    object AdminStatisticsScreen : Screens("admin_statistics")
+    object AdminSettingsScreen : Screens("admin_settings")
 }

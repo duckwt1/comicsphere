@@ -11,6 +11,7 @@ data class User(
     val createdAt: Timestamp? = null,
     val vipExpireDate: Long = 0, // Thay đổi từ Timestamp sang Long
     val isVip: Boolean = false,
+    val isAdmin: Boolean = false,
 )
 
 // Extension function để chuyển đổi từ Timestamp sang Long nếu cần

@@ -147,3 +147,8 @@ object Helpers {
             ?: throw IllegalArgumentException("Unable to generate MAC")
     }
 }
+
+object AdminConfig {
+    const val ADMIN_EMAIL = "admin@comicsphere.com"
+    const val ADMIN_PASSWORD = "admin123456" // Nên thay đổi thành mật khẩu mạnh hơn
+}

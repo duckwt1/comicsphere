@@ -107,11 +107,11 @@ fun LoginScreen(navController: NavController) {
 //                    tint = Color.Unspecified
 //                )
 
-                 Image(
-                     painter = painterResource(id = R.drawable.logo),
-                     contentDescription = "App Logo",
-                     modifier = Modifier.size(100.dp)
-                 )
+                Image(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "App Logo",
+                    modifier = Modifier.size(100.dp)
+                )
             }
 
             Text(
@@ -221,10 +221,17 @@ fun LoginForm(navController: NavController, viewModel: AuthViewModel) {
 
             Button(
                 onClick = {
-                    showError = email.isBlank() || password.isBlank()
-                    if (!showError) {
+                    val isEmailValid = isValidEmail(email)
+                    showError = email.isBlank() || password.isBlank() || !isEmailValid
+                    
+                    if (email.isBlank() || password.isBlank()) {
+                        // Hiển thị thông báo lỗi chung
+                    } else if (!isEmailValid) {
+                        // Hiển thị thông báo lỗi định dạng email
+                        Toast.makeText(context, "Invalid email format", Toast.LENGTH_SHORT).show()
+                    } else {
                         Log.d("Login", "Email: $email, Password: $password")
-                        viewModel.login(email, password)
+                        viewModel.login(email.trim(), password)
                     }
                 },
                 modifier = Modifier
