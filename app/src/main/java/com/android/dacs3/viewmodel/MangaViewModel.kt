@@ -928,38 +928,124 @@ class MangaViewModel @Inject constructor(
     }
 
     private suspend fun loadChapterWithPagination(mangaId: String, language: String, targetChapterId: String) {
-        var offset = 0
-        val limit = 100
-        var found = false
-        var hasMore = true
-
-        while (hasMore && !found) {
-            repository.getMangaChapters(mangaId, language, limit, offset).onSuccess { chapters ->
-                if (chapters.isEmpty()) {
-                    hasMore = false
-                    return@onSuccess
-                }
-
-                val chapterMap = chapters.associateBy { it.id }
+        try {
+            Log.d("MangaViewModel", "Directly loading chapter $targetChapterId for manga $mangaId")
+            
+            // Try to load the specific chapter directly first
+            val chapterDoc = FirebaseFirestore.getInstance()
+                .collection("manga")
+                .document(mangaId)
+                .collection("chapters")
+                .document(targetChapterId)
+                .get()
+                .await()
+            
+            if (chapterDoc.exists()) {
+                // Convert the document to ChapterData
+                val chapterNumber = chapterDoc.getString("chapter") ?: ""
+                val title = chapterDoc.getString("title") ?: ""
+                val translatedLanguage = chapterDoc.getString("language") ?: language
+                val publishAt = chapterDoc.getString("publishAt") ?: ""
+                
+                val chapterData = ChapterData(
+                    id = targetChapterId,
+                    attributes = ChapterAttributes(
+                        chapter = chapterNumber,
+                        title = title,
+                        translatedLanguage = translatedLanguage,
+                        externalUrl = null,
+                        publishAt = publishAt
+                    )
+                )
+                
+                // Add to chapter details
                 _chapterDetails.update { currentMap ->
-                    currentMap + chapterMap
+                    currentMap + (targetChapterId to chapterData)
                 }
-
-                if (chapterMap.containsKey(targetChapterId)) {
-                    found = true
-                    Log.d("MangaViewModel", "Found target chapter $targetChapterId at offset $offset")
-                } else {
-                    offset += limit
-                    Log.d("MangaViewModel", "Chapter $targetChapterId not found in current batch, trying next batch")
-                }
-            }.onFailure { e ->
-                Log.e("MangaViewModel", "Error loading chapters for $mangaId at offset $offset", e)
-                hasMore = false
+                
+                Log.d("MangaViewModel", "Successfully loaded target chapter $targetChapterId directly")
+                return
+            } else {
+                Log.d("MangaViewModel", "Chapter $targetChapterId not found directly, trying pagination")
             }
-        }
+            
+            // If direct loading fails, try pagination approach
+            var offset = 0
+            val limit = 100
+            var found = false
+            var hasMore = true
 
-        if (!found) {
-            Log.e("MangaViewModel", "Chapter $targetChapterId not found in any batch for manga $mangaId")
+            while (hasMore && !found) {
+                repository.getMangaChapters(mangaId, language, limit, offset).onSuccess { chapters ->
+                    if (chapters.isEmpty()) {
+                        hasMore = false
+                        return@onSuccess
+                    }
+
+                    val chapterMap = chapters.associateBy { it.id }
+                    _chapterDetails.update { currentMap ->
+                        currentMap + chapterMap
+                    }
+
+                    if (chapterMap.containsKey(targetChapterId)) {
+                        found = true
+                        Log.d("MangaViewModel", "Found target chapter $targetChapterId at offset $offset")
+                    } else {
+                        offset += limit
+                        Log.d("MangaViewModel", "Chapter $targetChapterId not found in current batch, trying next batch")
+                    }
+                }.onFailure { e ->
+                    Log.e("MangaViewModel", "Error loading chapters for $mangaId at offset $offset", e)
+                    hasMore = false
+                }
+            }
+
+            if (!found) {
+                // If still not found, try to get it directly from Firestore
+                Log.d("MangaViewModel", "Chapter $targetChapterId not found in any batch, trying direct Firestore query")
+                
+                try {
+                    val chapterDoc = FirebaseFirestore.getInstance()
+                        .collection("manga")
+                        .document(mangaId)
+                        .collection("chapters")
+                        .document(targetChapterId)
+                        .get()
+                        .await()
+                    
+                    if (chapterDoc.exists()) {
+                        // Convert the document to ChapterData
+                        val chapterNumber = chapterDoc.getString("chapter") ?: ""
+                        val title = chapterDoc.getString("title") ?: ""
+                        val translatedLanguage = chapterDoc.getString("language") ?: language
+                        val publishAt = chapterDoc.getString("publishAt") ?: ""
+                        
+                        val chapterData = ChapterData(
+                            id = targetChapterId,
+                            attributes = ChapterAttributes(
+                                chapter = chapterNumber,
+                                title = title,
+                                translatedLanguage = translatedLanguage,
+                                externalUrl = null,
+                                publishAt = publishAt
+                            )
+                        )
+                        
+                        // Add to chapter details
+                        _chapterDetails.update { currentMap ->
+                            currentMap + (targetChapterId to chapterData)
+                        }
+                        
+                        Log.d("MangaViewModel", "Successfully loaded target chapter $targetChapterId from Firestore")
+                    } else {
+                        Log.e("MangaViewModel", "Chapter $targetChapterId not found in Firestore")
+                    }
+                } catch (e: Exception) {
+                    Log.e("MangaViewModel", "Error loading chapter $targetChapterId directly from Firestore", e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MangaViewModel", "Error in loadChapterWithPagination for chapter $targetChapterId", e)
         }
     }
 

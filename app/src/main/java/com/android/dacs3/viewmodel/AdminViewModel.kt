@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.dacs3.data.model.ChapterAttributes
+import com.android.dacs3.data.model.ChapterData
 import com.android.dacs3.data.model.User
 import com.android.dacs3.data.model.MangaAttributes
 import com.android.dacs3.data.model.MangaData
@@ -54,6 +56,10 @@ class AdminViewModel @Inject constructor(
     val mangas: StateFlow<List<MangaData>> = _mangas.asStateFlow()
 
     private val firestore = FirebaseFirestore.getInstance()
+
+    // Add this property to store chapters for the selected manga
+    private val _mangaChapters = MutableStateFlow<List<ChapterData>>(emptyList())
+    val mangaChapters: StateFlow<List<ChapterData>> = _mangaChapters
 
     init {
         loadAllUsers()
@@ -490,8 +496,143 @@ class AdminViewModel @Inject constructor(
             }
         }
     }
+
+    fun loadChaptersForManga(mangaId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val chaptersCollection = firestore.collection("manga")
+                    .document(mangaId)
+                    .collection("chapters")
+                    .orderBy("chapter", Query.Direction.ASCENDING)
+                    .get()
+                    .await()
+                
+                val chaptersList = chaptersCollection.documents.mapNotNull { doc ->
+                    try {
+                        val chapterId = doc.id
+                        val chapterNumber = doc.getString("chapter") ?: ""
+                        val title = doc.getString("title") ?: ""
+                        val language = doc.getString("language") ?: "en"
+                        val pages = doc.getLong("pages")?.toInt() ?: 0
+                        
+                        ChapterData(
+                            id = chapterId,
+                            attributes = ChapterAttributes(
+                                chapter = chapterNumber,
+                                title = title,
+                                translatedLanguage = language,
+                                externalUrl = null,
+                                publishAt = doc.getString("publishAt") ?: ""
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error parsing chapter", e)
+                        null
+                    }
+                }
+                
+                _mangaChapters.value = chaptersList
+                
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error loading chapters", e)
+                _errorMessage.value = "Failed to load chapters: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun addChapter(
+        mangaId: String,
+        chapterNumber: String,
+        title: String,
+        language: String,
+        imageUrls: List<String>
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val chapterId = UUID.randomUUID().toString()
+                
+                // Create chapter document without imageUrls
+                val chapterData = hashMapOf(
+                    "chapter" to chapterNumber,
+                    "title" to title,
+                    "language" to language,
+                    "pages" to imageUrls.size,
+                    "publishAt" to System.currentTimeMillis().toString()
+                )
+                
+                // First, create the chapter document
+                firestore.collection("manga").document(mangaId)
+                    .collection("chapters").document(chapterId)
+                    .set(chapterData)
+                    .await()
+                
+                // Then create a subcollection "images" with document "imageList"
+                val imageListData = hashMapOf(
+                    "count" to imageUrls.size,
+                    "lastUpdated" to System.currentTimeMillis(),
+                    "urls" to imageUrls
+                )
+                
+                firestore.collection("manga").document(mangaId)
+                    .collection("chapters").document(chapterId)
+                    .collection("images").document("imageList")
+                    .set(imageListData)
+                    .await()
+                
+                Log.d("AdminViewModel", "Added new chapter: $title to manga $mangaId with ${imageUrls.size} images")
+                
+                // Reload chapter list
+                loadChaptersForManga(mangaId)
+                
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error adding chapter", e)
+                _errorMessage.value = "Failed to add chapter: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun deleteChapter(mangaId: String, chapterId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                // First delete the images subcollection
+                val imagesCollection = firestore.collection("manga").document(mangaId)
+                    .collection("chapters").document(chapterId)
+                    .collection("images")
+                
+                // Get all documents in the images subcollection
+                val imagesDocs = imagesCollection.get().await()
+                
+                // Delete each document in the subcollection
+                for (doc in imagesDocs.documents) {
+                    imagesCollection.document(doc.id).delete().await()
+                }
+                
+                // Then delete the chapter document
+                firestore.collection("manga").document(mangaId)
+                    .collection("chapters").document(chapterId)
+                    .delete()
+                    .await()
+                
+                Log.d("AdminViewModel", "Deleted chapter: $chapterId from manga $mangaId")
+                
+                // Reload chapter list
+                loadChaptersForManga(mangaId)
+                
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error deleting chapter", e)
+                _errorMessage.value = "Failed to delete chapter: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
 }
-
-
 
 

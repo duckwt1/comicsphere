@@ -30,8 +30,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.android.dacs3.data.model.ChapterData
+import com.android.dacs3.data.model.ChapterAttributes
 import com.android.dacs3.data.model.MangaData
 import com.android.dacs3.viewmodel.AdminViewModel
+import com.google.firebase.firestore.Query
+import java.util.UUID
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 // Định nghĩa màu sắc cho chủ đề trắng đen
 private val BlackWhiteTheme = object {
@@ -220,7 +226,8 @@ fun AdminMangaManagementScreen(
             },
             onEditManga = {
                 showEditMangaDialog = true
-            }
+            },
+            viewModel = viewModel
         )
     }
 
@@ -379,8 +386,11 @@ fun MangaDetailsDialog(
     manga: MangaData,
     onDismiss: () -> Unit,
     onDeleteManga: () -> Unit,
-    onEditManga: () -> Unit
+    onEditManga: () -> Unit,
+    viewModel: AdminViewModel = hiltViewModel()
 ) {
+    var showAddChapterDialog by remember { mutableStateOf(false) }
+    
     val title = manga.attributes.title["en"] ?: "Unknown Title"
     val description = manga.attributes.description["en"] ?: ""
     val status = manga.attributes.status ?: "Unknown"
@@ -558,6 +568,59 @@ fun MangaDetailsDialog(
                                 }
                             }
                         }
+
+                        item {
+                            Divider(color = BlackWhiteTheme.divider, modifier = Modifier.padding(vertical = 8.dp))
+                            
+                            Text(
+                                text = "Chapters",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BlackWhiteTheme.onSurface,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                            
+                            // Load chapters when dialog opens
+                            LaunchedEffect(manga.id) {
+                                viewModel.loadChaptersForManga(manga.id)
+                            }
+                            
+                            val chapters by viewModel.mangaChapters.collectAsState()
+                            
+                            if (chapters.isEmpty()) {
+                                Text(
+                                    text = "No chapters available",
+                                    color = BlackWhiteTheme.divider,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            } else {
+                                chapters.forEach { chapter ->
+                                    ChapterListItem(
+                                        chapter = chapter,
+                                        onDelete = {
+                                            viewModel.deleteChapter(manga.id, chapter.id)
+                                        }
+                                    )
+                                }
+                            }
+                            
+                            Button(
+                                onClick = { 
+                                    showAddChapterDialog = true
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = BlackWhiteTheme.primary,
+                                    contentColor = BlackWhiteTheme.onPrimary
+                                )
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Chapter")
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add New Chapter")
+                            }
+                        }
                     }
                 }
 
@@ -601,6 +664,272 @@ fun MangaDetailsDialog(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Edit")
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddChapterDialog) {
+        AddChapterDialog(
+            mangaId = manga.id,
+            onDismiss = { showAddChapterDialog = false },
+            onAdd = { chapterNumber, title, language, imageUrls ->
+                viewModel.addChapter(manga.id, chapterNumber, title, language, imageUrls)
+                showAddChapterDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun ChapterListItem(
+    chapter: ChapterData,
+    onDelete: () -> Unit
+) {
+    val chapterNumber = chapter.attributes.chapter ?: "N/A"
+    val title = chapter.attributes.title ?: "Untitled"
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = BlackWhiteTheme.surface
+        ),
+        border = BorderStroke(1.dp, BlackWhiteTheme.border)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Chapter $chapterNumber",
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+                Text(
+                    text = title,
+                    color = BlackWhiteTheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Chapter",
+                    tint = BlackWhiteTheme.error
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddChapterDialog(
+    mangaId: String,
+    onDismiss: () -> Unit,
+    onAdd: (chapterNumber: String, title: String, language: String, imageUrls: List<String>) -> Unit
+) {
+    var chapterNumber by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf("en") }
+    var imageUrlInput by remember { mutableStateOf("") }
+    var imageUrls by remember { mutableStateOf(listOf<String>()) }
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = BlackWhiteTheme.surface
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Add New Chapter",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Chapter number
+                OutlinedTextField(
+                    value = chapterNumber,
+                    onValueChange = { chapterNumber = it },
+                    label = { Text("Chapter Number") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        cursorColor = BlackWhiteTheme.primary,
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Title
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        cursorColor = BlackWhiteTheme.primary,
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Language
+                OutlinedTextField(
+                    value = language,
+                    onValueChange = { language = it },
+                    label = { Text("Language (e.g., en)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        cursorColor = BlackWhiteTheme.primary,
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Image URLs
+                Text(
+                    text = "Chapter Images",
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = imageUrlInput,
+                        onValueChange = { imageUrlInput = it },
+                        label = { Text("Image URL") },
+                        modifier = Modifier.weight(1f),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            cursorColor = BlackWhiteTheme.primary,
+                            focusedBorderColor = BlackWhiteTheme.primary,
+                            unfocusedBorderColor = BlackWhiteTheme.border
+                        )
+                    )
+                    
+                    IconButton(
+                        onClick = {
+                            if (imageUrlInput.isNotEmpty()) {
+                                imageUrls = imageUrls + imageUrlInput
+                                imageUrlInput = ""
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Image URL",
+                            tint = BlackWhiteTheme.primary
+                        )
+                    }
+                }
+                
+                // Display added image URLs
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(4.dp))
+                        .padding(8.dp)
+                ) {
+                    items(imageUrls) { url ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = url,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            
+                            IconButton(
+                                onClick = {
+                                    imageUrls = imageUrls.filter { it != url }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Remove URL",
+                                    tint = BlackWhiteTheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = BlackWhiteTheme.primary
+                        ),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = SolidColor(BlackWhiteTheme.border)
+                        )
+                    ) {
+                        Text("Cancel")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Button(
+                        onClick = {
+                            onAdd(chapterNumber, title, language, imageUrls)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BlackWhiteTheme.primary,
+                            contentColor = BlackWhiteTheme.onPrimary
+                        ),
+                        enabled = chapterNumber.isNotEmpty() && imageUrls.isNotEmpty()
+                    ) {
+                        Text("Add Chapter")
                     }
                 }
             }
@@ -1212,6 +1541,8 @@ fun EditMangaDialog(
         }
     }
 }
+
+
 
 
 
