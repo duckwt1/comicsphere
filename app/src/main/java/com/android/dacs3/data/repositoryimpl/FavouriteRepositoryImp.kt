@@ -1,6 +1,10 @@
 package com.android.dacs3.data.repositoryimpl
 
+import android.util.Log
+import com.android.dacs3.data.model.MangaAttributes
 import com.android.dacs3.data.model.MangaData
+import com.android.dacs3.data.model.Relationship
+import com.android.dacs3.data.model.RelationshipAttributes
 import com.android.dacs3.data.repository.FavouriteRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -35,9 +39,61 @@ class FavouriteRepositoryImp @Inject constructor(
 
     override suspend fun getMangaById(id: String): Result<MangaData> {
         return try {
-            val response = api.getMangaById(id)
-            Result.success(response.data) // Lấy MangaData từ response
+            
+            // Nếu API không thành công, thử lấy từ Firestore
+            val mangaDoc = FirebaseFirestore.getInstance()
+                .collection("manga")
+                .document(id)
+                .get()
+                .await()
+            
+            if (!mangaDoc.exists()) {
+                return Result.failure(Exception("Manga not found"))
+            }
+            
+            // Xử lý ảnh bìa - ưu tiên coverImageUrl
+            val coverImageUrl = mangaDoc.getString("coverImageUrl") ?: ""
+            val coverUrl = mangaDoc.getString("coverUrl") ?: ""
+            val coverFileName = mangaDoc.getString("coverFileName") ?: ""
+            
+            // Xác định URL cuối cùng theo thứ tự ưu tiên
+            val finalCoverUrl = when {
+                // 1. Ưu tiên coverImageUrl nếu có
+                coverImageUrl.isNotEmpty() -> coverImageUrl
+                // 2. Thử coverUrl nếu có
+                coverUrl.isNotEmpty() && coverUrl.startsWith("http") -> coverUrl
+                // 3. Nếu có coverFileName, tạo URL từ ID và fileName
+                coverFileName.isNotEmpty() -> "https://uploads.mangadex.org/covers/$id/$coverFileName.512.jpg"
+                // 4. Nếu không có gì, sử dụng placeholder
+                else -> "https://via.placeholder.com/512x768?text=No+Cover"
+            }
+            
+            // Tạo đối tượng MangaData với finalCoverUrl trong relationships
+            val mangaData = MangaData(
+                id = id,
+                attributes = MangaAttributes(
+                    title = (mangaDoc.get("title") as? Map<String, String>) 
+                        ?: mapOf("en" to (mangaDoc.getString("title") ?: "Unknown")),
+                    description = mapOf("en" to (mangaDoc.getString("description") ?: "")),
+                    status = mangaDoc.getString("status") ?: "",
+                    availableTranslatedLanguages = listOf("en"),
+                    altTitles = emptyList(),
+                    tags = emptyList()
+                ),
+                relationships = listOf(
+                    Relationship(
+                        id = id,
+                        type = "cover_art",
+                        attributes = RelationshipAttributes(
+                            fileName = finalCoverUrl  // Sử dụng finalCoverUrl đã xử lý
+                        )
+                    )
+                )
+            )
+            
+            Result.success(mangaData)
         } catch (e: Exception) {
+            Log.e("FavouriteRepositoryImp", "Error getting manga by ID", e)
             Result.failure(e)
         }
     }
