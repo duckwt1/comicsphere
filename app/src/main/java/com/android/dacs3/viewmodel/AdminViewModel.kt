@@ -593,12 +593,42 @@ class AdminViewModel @Inject constructor(
         _uploadProgress.value = 0f
         _uploadedImageUrl.value = null
     }
+
+    fun createUser(
+        email: String,
+        password: String,
+        fullname: String,
+        nickname: String,
+        isVip: Boolean = false,
+        isAdmin: Boolean = false
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+
+            try {
+                adminRepository.createUser(email, password, fullname, nickname, isVip, isAdmin)
+                    .onSuccess { userId ->
+                        Log.d("AdminViewModel", "Created user with ID: $userId")
+                        loadAllUsers() // Reload user list
+                    }
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to create user"
+                        Log.e("AdminViewModel", "Error creating user", e)
+                    }
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception creating user", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun clearErrorMessage() {
+        _errorMessage.value = null
+    }
 }
-
-
-
-
-
 
 
 

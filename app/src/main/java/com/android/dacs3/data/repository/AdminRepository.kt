@@ -38,5 +38,16 @@ interface AdminRepository {
     
     // Tag management methods
     suspend fun getAllTags(): Result<List<Tag>>
+    
+    // Add new method for creating users
+    suspend fun createUser(
+        email: String,
+        password: String,
+        fullname: String,
+        nickname: String,
+        isVip: Boolean = false,
+        isAdmin: Boolean = false
+    ): Result<String> // Returns the new user ID
 }
+
 

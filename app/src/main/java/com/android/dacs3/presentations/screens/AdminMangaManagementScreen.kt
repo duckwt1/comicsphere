@@ -79,7 +79,7 @@ fun AdminMangaManagementScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditMangaDialog by remember { mutableStateOf(false) }
     var showAddMangaDialog by remember { mutableStateOf(false) }
-    
+
     // Add this LaunchedEffect to load manga data when the screen is first composed
     LaunchedEffect(key1 = Unit) {
         // Ensure manga list is loaded when screen opens
@@ -234,7 +234,7 @@ fun AdminMangaManagementScreen(
     if (showMangaDetailsDialog && selectedManga != null) {
         MangaDetailsDialog(
             manga = selectedManga!!,
-            onDismiss = { 
+            onDismiss = {
                 showMangaDetailsDialog = false
                 viewModel.resetUploadState()
             },
@@ -291,7 +291,7 @@ fun AdminMangaManagementScreen(
     // Add manga dialog
     if (showAddMangaDialog) {
         AddMangaDialog(
-            onDismiss = { 
+            onDismiss = {
                 showAddMangaDialog = false
                 viewModel.resetUploadState()
             },
@@ -307,7 +307,7 @@ fun AdminMangaManagementScreen(
     if (showEditMangaDialog && selectedManga != null) {
         EditMangaDialog(
             manga = selectedManga!!,
-            onDismiss = { 
+            onDismiss = {
                 showEditMangaDialog = false
                 viewModel.resetUploadState()
             },
@@ -354,9 +354,9 @@ fun MangaListItem(
                     .clip(RoundedCornerShape(4.dp)),
                 contentScale = ContentScale.Crop
             )
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -367,20 +367,20 @@ fun MangaListItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
+
                 Text(
                     text = "Author: ${manga.attributes.author ?: "Unknown"}",
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
+
                 Text(
                     text = "Status: ${manga.attributes.status ?: "Unknown"}",
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            
+
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = "View details",
@@ -400,7 +400,7 @@ fun MangaDetailsDialog(
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     var showAddChapterDialog by remember { mutableStateOf(false) }
-    
+
     val title = manga.attributes.title["en"] ?: "Unknown Title"
     val description = manga.attributes.description["en"] ?: ""
     val status = manga.attributes.status ?: "Unknown"
@@ -587,7 +587,7 @@ fun MangaDetailsDialog(
 
                         item {
                             Divider(color = BlackWhiteTheme.divider, modifier = Modifier.padding(vertical = 8.dp))
-                            
+
                             Text(
                                 text = "Chapters",
                                 fontSize = 18.sp,
@@ -595,14 +595,14 @@ fun MangaDetailsDialog(
                                 color = BlackWhiteTheme.onSurface,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
-                            
+
                             // Load chapters when dialog opens
                             LaunchedEffect(manga.id) {
                                 viewModel.loadChaptersForManga(manga.id)
                             }
-                            
+
                             val chapters by viewModel.mangaChapters.collectAsState()
-                            
+
                             if (chapters.isEmpty()) {
                                 Text(
                                     text = "No chapters available",
@@ -619,9 +619,9 @@ fun MangaDetailsDialog(
                                     )
                                 }
                             }
-                            
+
                             Button(
-                                onClick = { 
+                                onClick = {
                                     showAddChapterDialog = true
                                 },
                                 modifier = Modifier
@@ -705,7 +705,7 @@ fun ChapterListItem(
 ) {
     val chapterNumber = chapter.attributes.chapter ?: "N/A"
     val title = chapter.attributes.title ?: "Untitled"
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -738,7 +738,7 @@ fun ChapterListItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            
+
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.Delete,
@@ -763,11 +763,11 @@ fun AddChapterDialog(
     var language by remember { mutableStateOf("en") }
     var imageUrlInput by remember { mutableStateOf("") }
     var imageUrls by remember { mutableStateOf(listOf<String>()) }
-    
+
     // For image upload
     val isUploading by viewModel.isUploading.collectAsState()
     val context = LocalContext.current
-    
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -794,7 +794,7 @@ fun AddChapterDialog(
             }
         }
     }
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -823,9 +823,9 @@ fun AddChapterDialog(
                     fontWeight = FontWeight.Bold,
                     color = BlackWhiteTheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Chapter number
                 OutlinedTextField(
                     value = chapterNumber,
@@ -839,9 +839,9 @@ fun AddChapterDialog(
                         unfocusedBorderColor = BlackWhiteTheme.border
                     )
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Chapter title
                 OutlinedTextField(
                     value = title,
@@ -854,9 +854,9 @@ fun AddChapterDialog(
                         unfocusedBorderColor = BlackWhiteTheme.border
                     )
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Language dropdown
                 ExposedDropdownMenuBox(
                     expanded = false,
@@ -884,7 +884,7 @@ fun AddChapterDialog(
                             unfocusedBorderColor = BlackWhiteTheme.border
                         )
                     )
-                    
+
                     // Dropdown menu content
                     DropdownMenu(
                         expanded = false,
@@ -901,18 +901,18 @@ fun AddChapterDialog(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Image upload section
                 Text(
                     text = "Chapter Images",
                     fontWeight = FontWeight.Medium,
                     color = BlackWhiteTheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 // Upload button
                 Button(
                     onClick = { imagePickerLauncher.launch("image/*") },
@@ -930,9 +930,9 @@ fun AddChapterDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (isUploading) "Uploading..." else "Upload Image")
                 }
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 // Manual URL input
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -949,7 +949,7 @@ fun AddChapterDialog(
                             unfocusedBorderColor = BlackWhiteTheme.border
                         )
                     )
-                    
+
                     IconButton(
                         onClick = {
                             if (imageUrlInput.isNotEmpty()) {
@@ -965,7 +965,7 @@ fun AddChapterDialog(
                         )
                     }
                 }
-                
+
                 // Display added image URLs
                 Box(
                     modifier = Modifier
@@ -998,7 +998,7 @@ fun AddChapterDialog(
                                         .clip(RoundedCornerShape(4.dp)),
                                     contentScale = ContentScale.Crop
                                 )
-                                
+
                                 // URL text
                                 Text(
                                     text = url,
@@ -1008,7 +1008,7 @@ fun AddChapterDialog(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                
+
                                 // Remove button
                                 IconButton(
                                     onClick = {
@@ -1022,14 +1022,14 @@ fun AddChapterDialog(
                                     )
                                 }
                             }
-                            
+
                             Divider(
                                 color = BlackWhiteTheme.divider,
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
                         }
                     }
-                    
+
                     // Show loading indicator when uploading
                     if (isUploading) {
                         Box(
@@ -1048,9 +1048,9 @@ fun AddChapterDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1067,9 +1067,9 @@ fun AddChapterDialog(
                     ) {
                         Text("Cancel")
                     }
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     Button(
                         onClick = {
                             onAdd(chapterNumber, title, language, imageUrls)
@@ -1100,13 +1100,13 @@ fun AddMangaDialog(
     var coverUrl by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("ongoing") }
     var author by remember { mutableStateOf("") }
-    
+
     // For image upload
     var showImagePicker by remember { mutableStateOf(false) }
     val isUploading by viewModel.isUploading.collectAsState()
     val uploadedImageUrl by viewModel.uploadedImageUrl.collectAsState()
     val context = LocalContext.current
-    
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -1132,27 +1132,27 @@ fun AddMangaDialog(
             }
         }
     }
-    
+
     // Update coverUrl when uploadedImageUrl changes
     LaunchedEffect(uploadedImageUrl) {
         uploadedImageUrl?.let {
             coverUrl = it
         }
     }
-    
+
     // Selected tagIds
     var selectedTagIds by remember { mutableStateOf(setOf<String>()) }
-    
+
     // Get tags from viewModel
     val tags by viewModel.firestoreTags.collectAsState()
-    
+
     // Reset upload state when dialog is dismissed
     DisposableEffect(Unit) {
         onDispose {
             viewModel.resetUploadState()
         }
     }
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -1181,9 +1181,9 @@ fun AddMangaDialog(
                     fontWeight = FontWeight.Bold,
                     color = BlackWhiteTheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Scrollable content
                 LazyColumn(
                     modifier = Modifier
@@ -1205,10 +1205,10 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Description field
                     item {
                         OutlinedTextField(
@@ -1226,10 +1226,10 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Cover image section
                     item {
                         Text(
@@ -1237,9 +1237,9 @@ fun AddMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -1272,7 +1272,7 @@ fun AddMangaDialog(
                                         tint = BlackWhiteTheme.divider
                                     )
                                 }
-                                
+
                                 // Show loading indicator when uploading
                                 if (isUploading) {
                                     Box(
@@ -1288,9 +1288,9 @@ fun AddMangaDialog(
                                     }
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.width(16.dp))
-                            
+
                             Column(
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -1311,9 +1311,9 @@ fun AddMangaDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Upload Cover")
                                 }
-                                
+
                                 Spacer(modifier = Modifier.height(8.dp))
-                                
+
                                 // URL input field
                                 OutlinedTextField(
                                     value = coverUrl,
@@ -1330,10 +1330,10 @@ fun AddMangaDialog(
                                 )
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Status dropdown
                     item {
                         Text(
@@ -1341,9 +1341,9 @@ fun AddMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         // Status options
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -1355,29 +1355,29 @@ fun AddMangaDialog(
                                 selected = status == "ongoing",
                                 onClick = { status = "ongoing" }
                             )
-                            
+
                             StatusOption(
                                 text = "Completed",
                                 selected = status == "completed",
                                 onClick = { status = "completed" }
                             )
-                            
+
                             StatusOption(
                                 text = "Hiatus",
                                 selected = status == "hiatus",
                                 onClick = { status = "hiatus" }
                             )
-                            
+
                             StatusOption(
                                 text = "Cancelled",
                                 selected = status == "cancelled",
                                 onClick = { status = "cancelled" }
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Author field
                     item {
                         OutlinedTextField(
@@ -1394,10 +1394,10 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Tags section
                     item {
                         Text(
@@ -1405,12 +1405,12 @@ fun AddMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         // Group tags by category
                         val groupedTags = tags.groupBy { it.group }
-                        
+
                         groupedTags.forEach { (group, tagsInGroup) ->
                             Text(
                                 text = group.capitalize(),
@@ -1418,9 +1418,9 @@ fun AddMangaDialog(
                                 fontSize = 14.sp,
                                 color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
                             )
-                            
+
                             Spacer(modifier = Modifier.height(4.dp))
-                            
+
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1428,7 +1428,7 @@ fun AddMangaDialog(
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTagIds.contains(tag.id)
-                                    
+
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = {
@@ -1446,14 +1446,14 @@ fun AddMangaDialog(
                                     )
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1474,9 +1474,9 @@ fun AddMangaDialog(
                     ) {
                         Text("Cancel")
                     }
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     // Add button
                     Button(
                         onClick = {
@@ -1531,7 +1531,7 @@ fun EditMangaDialog(
     val initialCoverUrl = manga.relationships.find { it.type == "cover_art" }?.attributes?.fileName ?: ""
     val initialStatus = manga.attributes.status ?: "ongoing"
     val initialAuthor = manga.attributes.author ?: ""
-    
+
     // Lấy danh sách tagIds từ manga
     val initialTagIds = manga.attributes.tags.map { it.id }
 
@@ -1540,12 +1540,12 @@ fun EditMangaDialog(
     var coverUrl by remember { mutableStateOf(initialCoverUrl) }
     var status by remember { mutableStateOf(initialStatus) }
     var author by remember { mutableStateOf(initialAuthor) }
-    
+
     // For image upload
     val isUploading by viewModel.isUploading.collectAsState()
     val uploadedImageUrl by viewModel.uploadedImageUrl.collectAsState()
     val context = LocalContext.current
-    
+
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -1571,27 +1571,27 @@ fun EditMangaDialog(
             }
         }
     }
-    
+
     // Update coverUrl when uploadedImageUrl changes
     LaunchedEffect(uploadedImageUrl) {
         uploadedImageUrl?.let {
             coverUrl = it
         }
     }
-    
+
     // Selected tagIds
     var selectedTagIds by remember { mutableStateOf(initialTagIds.toSet()) }
-    
+
     // Get tags from viewModel
     val tags by viewModel.firestoreTags.collectAsState()
-    
+
     // Reset upload state when dialog is dismissed
     DisposableEffect(Unit) {
         onDispose {
             viewModel.resetUploadState()
         }
     }
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -1620,9 +1620,9 @@ fun EditMangaDialog(
                     fontWeight = FontWeight.Bold,
                     color = BlackWhiteTheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Scrollable content
                 LazyColumn(
                     modifier = Modifier
@@ -1644,10 +1644,10 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Description field
                     item {
                         OutlinedTextField(
@@ -1665,10 +1665,10 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Cover image section
                     item {
                         Text(
@@ -1676,9 +1676,9 @@ fun EditMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -1711,7 +1711,7 @@ fun EditMangaDialog(
                                         tint = BlackWhiteTheme.divider
                                     )
                                 }
-                                
+
                                 // Show loading indicator when uploading
                                 if (isUploading) {
                                     Box(
@@ -1727,9 +1727,9 @@ fun EditMangaDialog(
                                     }
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.width(16.dp))
-                            
+
                             Column(
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -1750,9 +1750,9 @@ fun EditMangaDialog(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text("Upload Cover")
                                 }
-                                
+
                                 Spacer(modifier = Modifier.height(8.dp))
-                                
+
                                 // URL input field
                                 OutlinedTextField(
                                     value = coverUrl,
@@ -1769,10 +1769,10 @@ fun EditMangaDialog(
                                 )
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Status dropdown
                     item {
                         Text(
@@ -1780,9 +1780,9 @@ fun EditMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         // Status options
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
@@ -1794,29 +1794,29 @@ fun EditMangaDialog(
                                 selected = status == "ongoing",
                                 onClick = { status = "ongoing" }
                             )
-                            
+
                             StatusOption(
                                 text = "Completed",
                                 selected = status == "completed",
                                 onClick = { status = "completed" }
                             )
-                            
+
                             StatusOption(
                                 text = "Hiatus",
                                 selected = status == "hiatus",
                                 onClick = { status = "hiatus" }
                             )
-                            
+
                             StatusOption(
                                 text = "Cancelled",
                                 selected = status == "cancelled",
                                 onClick = { status = "cancelled" }
                             )
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Author field
                     item {
                         OutlinedTextField(
@@ -1833,10 +1833,10 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     // Tags section
                     item {
                         Text(
@@ -1844,12 +1844,12 @@ fun EditMangaDialog(
                             fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
-                        
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        
+
                         // Group tags by category
                         val groupedTags = tags.groupBy { it.group }
-                        
+
                         groupedTags.forEach { (group, tagsInGroup) ->
                             Text(
                                 text = group.capitalize(),
@@ -1857,9 +1857,9 @@ fun EditMangaDialog(
                                 fontSize = 14.sp,
                                 color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
                             )
-                            
+
                             Spacer(modifier = Modifier.height(4.dp))
-                            
+
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1867,7 +1867,7 @@ fun EditMangaDialog(
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTagIds.contains(tag.id)
-                                    
+
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = {
@@ -1885,14 +1885,14 @@ fun EditMangaDialog(
                                     )
                                 }
                             }
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1913,9 +1913,9 @@ fun EditMangaDialog(
                     ) {
                         Text("Cancel")
                     }
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     // Save button
                     Button(
                         onClick = {

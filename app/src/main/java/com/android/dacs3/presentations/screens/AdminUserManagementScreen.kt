@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -62,6 +63,12 @@ fun AdminUserManagementScreen(
     var showUserDetailsDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditUserDialog by remember { mutableStateOf(false) }
+    var showAddUserDialog by remember { mutableStateOf(false) }
+
+    // Load users when the screen is first composed
+    LaunchedEffect(key1 = Unit) {
+        viewModel.loadAllUsers()
+    }
 
     Scaffold(
         topBar = {
@@ -79,8 +86,27 @@ fun AdminUserManagementScreen(
                             tint = BlackWhiteTheme.onPrimary
                         )
                     }
+                },
+                actions = {
+                    // Add button to create new user
+                    IconButton(onClick = { showAddUserDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add User",
+                            tint = BlackWhiteTheme.onPrimary
+                        )
+                    }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddUserDialog = true },
+                containerColor = BlackWhiteTheme.primary,
+                contentColor = BlackWhiteTheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add User")
+            }
         }
     ) { innerPadding ->
         Column(
@@ -247,6 +273,17 @@ fun AdminUserManagementScreen(
                 ) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    // Add User Dialog
+    if (showAddUserDialog) {
+        AddUserDialog(
+            onDismiss = { showAddUserDialog = false },
+            onAddUser = { email, password, fullname, nickname, isVip, isAdmin ->
+                viewModel.createUser(email, password, fullname, nickname, isVip, isAdmin)
+                showAddUserDialog = false
             }
         )
     }
@@ -667,6 +704,191 @@ fun EditUserDialog(
                         )
                     ) {
                         Text("Save")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddUserDialog(
+    onDismiss: () -> Unit,
+    onAddUser: (email: String, password: String, fullname: String, nickname: String, isVip: Boolean, isAdmin: Boolean) -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var fullname by remember { mutableStateOf("") }
+    var nickname by remember { mutableStateOf("") }
+    var isVip by remember { mutableStateOf(false) }
+    var isAdmin by remember { mutableStateOf(false) }
+    
+    // Validation states
+    val isEmailValid = email.contains("@") && email.contains(".")
+    val isPasswordValid = password.length >= 6
+    val isFormValid = isEmailValid && isPasswordValid && fullname.isNotEmpty() && nickname.isNotEmpty()
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = BlackWhiteTheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Add New User",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Email field
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = email.isNotEmpty() && !isEmailValid,
+                    supportingText = {
+                        if (email.isNotEmpty() && !isEmailValid) {
+                            Text("Please enter a valid email address")
+                        }
+                    },
+                    singleLine = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Password field
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = password.isNotEmpty() && !isPasswordValid,
+                    supportingText = {
+                        if (password.isNotEmpty() && !isPasswordValid) {
+                            Text("Password must be at least 6 characters")
+                        }
+                    },
+                    singleLine = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Full name field
+                OutlinedTextField(
+                    value = fullname,
+                    onValueChange = { fullname = it },
+                    label = { Text("Full Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Nickname field
+                OutlinedTextField(
+                    value = nickname,
+                    onValueChange = { nickname = it },
+                    label = { Text("Nickname") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = BlackWhiteTheme.primary,
+                        unfocusedBorderColor = BlackWhiteTheme.border
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // VIP and Admin checkboxes
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isVip,
+                        onCheckedChange = { isVip = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = BlackWhiteTheme.primary,
+                            uncheckedColor = BlackWhiteTheme.border
+                        )
+                    )
+                    Text("VIP User", color = BlackWhiteTheme.onSurface)
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Checkbox(
+                        checked = isAdmin,
+                        onCheckedChange = { isAdmin = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = BlackWhiteTheme.primary,
+                            uncheckedColor = BlackWhiteTheme.border
+                        )
+                    )
+                    Text("Admin User", color = BlackWhiteTheme.onSurface)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = BlackWhiteTheme.primary
+                        )
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            onAddUser(email, password, fullname, nickname, isVip, isAdmin)
+                        },
+                        enabled = isFormValid,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BlackWhiteTheme.primary,
+                            contentColor = BlackWhiteTheme.onPrimary,
+                            disabledContainerColor = BlackWhiteTheme.divider
+                        )
+                    ) {
+                        Text("Add User")
                     }
                 }
             }
