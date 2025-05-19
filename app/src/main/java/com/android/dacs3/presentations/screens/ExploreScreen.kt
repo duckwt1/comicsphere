@@ -118,10 +118,12 @@ fun ExploreScreen(
 
                     // Filter button
                     IconButton(onClick = { showTagFilter = !showTagFilter }) {
+                        val iconResId = if (showTagFilter) R.drawable.ic_filter_2 else R.drawable.ic_filter_1
                         Icon(
-                            imageVector = Icons.Default.Home,  // Thêm biểu tượng FilterList
-                            contentDescription = "Filter",
-                            tint = if (selectedTags.isNotEmpty()) Color.Blue else Color.Gray
+                            painter = painterResource(id = iconResId),
+                            contentDescription = if (showTagFilter) "Close Filter" else "Open Filter",
+                            modifier = Modifier.size(24.dp),
+                            tint = Color.Black
                         )
                     }
                 }
@@ -208,25 +210,11 @@ fun MangaList(
         items(mangas) { manga ->
             MangaItem(manga = manga, navController = navController)
         }
-
-        if (mangas.isNotEmpty() && mangas.size >= 3 && 
-            ( mangas.size >= 15)) {
-            item {
-                Spacer(modifier = Modifier)
-            }
-            item {
-                Button(
-                    onClick = { onLoadMore() },
-                    modifier = Modifier
-                        .wrapContentSize(Alignment.Center)
-                        .background(Color.Transparent)
-                ) {
-                    Text(text = "Load More", fontSize = 12.sp, maxLines = 1)
-                }
-            }
-            item {
-                Spacer(modifier = Modifier)
-            }
+        
+        // Xóa nút "Load More"
+        // Thêm padding ở cuối danh sách để có không gian trống
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

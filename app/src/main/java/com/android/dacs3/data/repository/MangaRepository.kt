@@ -12,16 +12,13 @@ import com.android.dacs3.data.model.TagWrapper
 import com.android.dacs3.data.model.User
 
 interface MangaRepository {
-    suspend fun fetchMangaList(limit: Int, offset: Int): Result<MangaListResponse>
-    suspend fun searchManga(title: String): Result<MangaListResponse>
-    suspend fun getMangaById(id: String): Result<MangaDetailResponse>
+
     suspend fun getMangaChapters(
         mangaId: String,
         language: String,
         limit: Int,
         offset: Int
     ): Result<List<ChapterData>>
-    suspend fun getChapterContent(chapterId: String): Result<ChapterContentResponse>
 
     suspend fun saveReadingProgress(
         userId: String,
@@ -46,23 +43,6 @@ interface MangaRepository {
         mangaId: String
     ): Result<Boolean>
 
-    suspend fun fetchTrendingManga(limit: Int, offset: Int): Result<MangaListResponse>
-
-    suspend fun fetchRecommendedManga(
-        includedTagIds: List<String>,
-        limit: Int,
-        offset: Int
-    ): Result<MangaListResponse>
-
-    suspend fun getTags(): Result<List<TagWrapper>>
-
-    suspend fun getMangaByTags(
-        includedTags: List<String>,
-        includedTagsMode: String = "AND",
-        limit: Int = 100,
-        offset: Int = 0
-    ): Result<MangaListResponse>
-
     suspend fun addComment(
         mangaId: String,
         userId: String,
@@ -74,10 +54,6 @@ interface MangaRepository {
 
     suspend fun deleteComment(mangaId: String, commentId: String): Result<Boolean>
 
-    suspend fun likeComment(mangaId: String, commentId: String, userId: String): Result<Boolean>
-
-    suspend fun checkIfUserLikedComment(commentId: String, userId: String): Result<Boolean>
-
     suspend fun getUserInfo(userId: String): Result<User>
 
     suspend fun getReadChapters(
@@ -88,13 +64,9 @@ interface MangaRepository {
 
     suspend fun getTagsFromFirestore(): Result<List<Tag>>
 
-    suspend fun fetchTrendingMangaFromFirestore(limit: Int = 20): Result<List<MangaData>>
+    suspend fun fetchTrendingMangaFromFirestore(limit: Int = 1000): Result<List<MangaData>>
 
-    suspend fun fetchRecommendedMangaFromFirestore(
-        userId: String,
-        includedTagIds: List<String>? = null,
-        limit: Int = 20
-    ): Result<List<MangaData>>
+    suspend fun fetchRecommendedMangaFromFirestore(includedTagIds: List<String>? = null, limit: Int = 1000): Result<List<MangaData>>
 
     suspend fun getChaptersFromFirestore(mangaId: String, language: String): Result<List<ChapterData>>
 
@@ -103,4 +75,14 @@ interface MangaRepository {
     suspend fun getNextChapterFromFirestore(mangaId: String, currentChapterId: String, language: String): Result<ChapterData?>
 
     suspend fun getLastReadChapter(userId: String, mangaId: String, language: String): Result<Pair<String, Int>?>
+
+    suspend fun searchMangaFromFirestore(title: String): Result<List<MangaData>>
+
+    suspend fun getMangaDetailsFromFirestore(mangaId: String): Result<MangaData>
+
+    suspend fun filterMangaByTags(tagIds: List<String>, filterMode: String): Result<List<MangaData>>
+
+    suspend fun fetchMangaListFromFirestore(reset: Boolean = false, limit: Int = 20): Result<List<MangaData>>
+
+    suspend fun incrementMangaViewCount(mangaId: String): Result<Boolean>
 }

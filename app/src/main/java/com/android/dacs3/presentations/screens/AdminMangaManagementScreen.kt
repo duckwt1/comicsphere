@@ -1,5 +1,9 @@
 package com.android.dacs3.presentations.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +42,11 @@ import com.google.firebase.firestore.Query
 import java.util.UUID
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 // Định nghĩa màu sắc cho chủ đề trắng đen
 private val BlackWhiteTheme = object {
@@ -70,6 +79,12 @@ fun AdminMangaManagementScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showEditMangaDialog by remember { mutableStateOf(false) }
     var showAddMangaDialog by remember { mutableStateOf(false) }
+    
+    // Add this LaunchedEffect to load manga data when the screen is first composed
+    LaunchedEffect(key1 = Unit) {
+        // Ensure manga list is loaded when screen opens
+        viewModel.loadMangaList()
+    }
 
     Scaffold(
         topBar = {
@@ -219,7 +234,10 @@ fun AdminMangaManagementScreen(
     if (showMangaDetailsDialog && selectedManga != null) {
         MangaDetailsDialog(
             manga = selectedManga!!,
-            onDismiss = { showMangaDetailsDialog = false },
+            onDismiss = { 
+                showMangaDetailsDialog = false
+                viewModel.resetUploadState()
+            },
             onDeleteManga = {
                 showMangaDetailsDialog = false
                 showDeleteConfirmDialog = true
@@ -273,10 +291,14 @@ fun AdminMangaManagementScreen(
     // Add manga dialog
     if (showAddMangaDialog) {
         AddMangaDialog(
-            onDismiss = { showAddMangaDialog = false },
-            onAdd = { title, description, coverUrl, status, tags ->
-                viewModel.addManga(title, description, coverUrl, status, tags)
+            onDismiss = { 
                 showAddMangaDialog = false
+                viewModel.resetUploadState()
+            },
+            onAdd = { title, description, coverUrl, status, author, tags ->
+                viewModel.addManga(title, description, coverUrl, status, author, tags)
+                showAddMangaDialog = false
+                viewModel.resetUploadState()
             }
         )
     }
@@ -285,11 +307,15 @@ fun AdminMangaManagementScreen(
     if (showEditMangaDialog && selectedManga != null) {
         EditMangaDialog(
             manga = selectedManga!!,
-            onDismiss = { showEditMangaDialog = false },
-            onSave = { title, description, coverUrl, status, tags ->
-                viewModel.updateManga(selectedManga!!.id, title, description, coverUrl, status, tags)
+            onDismiss = { 
+                showEditMangaDialog = false
+                viewModel.resetUploadState()
+            },
+            onSave = { title, description, coverUrl, status, author, tags ->
+                viewModel.updateManga(selectedManga!!.id, title, description, coverUrl, status, author, tags)
                 showEditMangaDialog = false
                 showMangaDetailsDialog = false
+                viewModel.resetUploadState()
             }
         )
     }
@@ -300,14 +326,11 @@ fun MangaListItem(
     manga: MangaData,
     onClick: () -> Unit
 ) {
-    val title = manga.attributes.title["en"] ?: "Unknown Title"
-    val coverUrl = manga.relationships.find { it.type == "cover_art" }?.attributes?.fileName ?: ""
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = BlackWhiteTheme.surface
         ),
@@ -316,66 +339,53 @@ fun MangaListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Cover image
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(coverUrl)
+                    .data(manga.relationships.find { it.type == "cover_art" }?.attributes?.fileName)
                     .crossfade(true)
                     .build(),
-                contentDescription = title,
+                contentDescription = "Manga cover",
                 modifier = Modifier
-                    .size(70.dp, 100.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(8.dp)),
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(4.dp)),
                 contentScale = ContentScale.Crop
             )
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Manga info
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = title,
+                    text = manga.attributes.title["en"] ?: "Unknown title",
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = BlackWhiteTheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
+                
                 Text(
-                    text = "Status: ${manga.attributes.status ?: "Unknown"}",
-                    fontSize = 14.sp,
-                    color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                val description = manga.attributes.description["en"] ?: ""
-                Text(
-                    text = description,
-                    fontSize = 12.sp,
-                    color = BlackWhiteTheme.onSurface.copy(alpha = 0.5f),
-                    maxLines = 2,
+                    text = "Author: ${manga.attributes.author ?: "Unknown"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-
-            // Actions
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = BlackWhiteTheme.iconTint
+                
+                Text(
+                    text = "Status: ${manga.attributes.status ?: "Unknown"}",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
+            
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = "View details",
+                tint = BlackWhiteTheme.iconTint
+            )
         }
     }
 }
@@ -490,6 +500,12 @@ fun MangaDetailsDialog(
                                         text = "Status: $status",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
+                                    )
+
+                                    Text(
+                                        text = "Author: ${manga.attributes.author ?: "Unknown"}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BlackWhiteTheme.onSurface
                                     )
                                 }
                             }
@@ -739,7 +755,8 @@ fun ChapterListItem(
 fun AddChapterDialog(
     mangaId: String,
     onDismiss: () -> Unit,
-    onAdd: (chapterNumber: String, title: String, language: String, imageUrls: List<String>) -> Unit
+    onAdd: (chapterNumber: String, title: String, language: String, imageUrls: List<String>) -> Unit,
+    viewModel: AdminViewModel = hiltViewModel()
 ) {
     var chapterNumber by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
@@ -747,28 +764,59 @@ fun AddChapterDialog(
     var imageUrlInput by remember { mutableStateOf("") }
     var imageUrls by remember { mutableStateOf(listOf<String>()) }
     
+    // For image upload
+    val isUploading by viewModel.isUploading.collectAsState()
+    val context = LocalContext.current
+    
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Launch coroutine to handle the upload
+            val scope = CoroutineScope(Dispatchers.Main)
+            scope.launch {
+                viewModel.uploadChapterImage(it).collect { result ->
+                    when (result) {
+                        is AdminViewModel.Result.Success -> {
+                            // Add the uploaded URL to the list
+                            imageUrls = imageUrls + result.data
+                            Toast.makeText(context, "Image uploaded successfully", Toast.LENGTH_SHORT).show()
+                        }
+                        is AdminViewModel.Result.Failure -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                        }
+                        is AdminViewModel.Result.Loading -> {
+                            // Could update a progress indicator here
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
         )
     ) {
-        Card(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = BlackWhiteTheme.surface
-            ),
-            shape = RoundedCornerShape(16.dp)
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(16.dp),
+            color = BlackWhiteTheme.surface,
+            border = BorderStroke(1.dp, BlackWhiteTheme.border)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(16.dp)
             ) {
+                // Title
                 Text(
                     text = "Add New Chapter",
                     fontSize = 20.sp,
@@ -784,6 +832,7 @@ fun AddChapterDialog(
                     onValueChange = { chapterNumber = it },
                     label = { Text("Chapter Number") },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         cursorColor = BlackWhiteTheme.primary,
                         focusedBorderColor = BlackWhiteTheme.primary,
@@ -791,28 +840,13 @@ fun AddChapterDialog(
                     )
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                // Title
+                // Chapter title
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        cursorColor = BlackWhiteTheme.primary,
-                        focusedBorderColor = BlackWhiteTheme.primary,
-                        unfocusedBorderColor = BlackWhiteTheme.border
-                    )
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Language
-                OutlinedTextField(
-                    value = language,
-                    onValueChange = { language = it },
-                    label = { Text("Language (e.g., en)") },
+                    label = { Text("Chapter Title") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         cursorColor = BlackWhiteTheme.primary,
@@ -823,13 +857,83 @@ fun AddChapterDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Image URLs
+                // Language dropdown
+                ExposedDropdownMenuBox(
+                    expanded = false,
+                    onExpandedChange = { },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = when (language) {
+                            "en" -> "English"
+                            "vi" -> "Vietnamese"
+                            else -> "English"
+                        },
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("Language") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = false)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            cursorColor = BlackWhiteTheme.primary,
+                            focusedBorderColor = BlackWhiteTheme.primary,
+                            unfocusedBorderColor = BlackWhiteTheme.border
+                        )
+                    )
+                    
+                    // Dropdown menu content
+                    DropdownMenu(
+                        expanded = false,
+                        onDismissRequest = { },
+                        modifier = Modifier.exposedDropdownSize()
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("English") },
+                            onClick = { language = "en" }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Vietnamese") },
+                            onClick = { language = "vi" }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Image upload section
                 Text(
                     text = "Chapter Images",
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Medium,
                     color = BlackWhiteTheme.onSurface
                 )
                 
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Upload button
+                Button(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BlackWhiteTheme.primary,
+                        contentColor = BlackWhiteTheme.onPrimary
+                    ),
+                    enabled = !isUploading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Upload"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (isUploading) "Uploading..." else "Upload Image")
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Manual URL input
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -863,36 +967,83 @@ fun AddChapterDialog(
                 }
                 
                 // Display added image URLs
-                LazyColumn(
+                Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .height(120.dp)
-                        .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(4.dp))
-                        .padding(8.dp)
                 ) {
-                    items(imageUrls) { url ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = url,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            
-                            IconButton(
-                                onClick = {
-                                    imageUrls = imageUrls.filter { it != url }
-                                }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(4.dp))
+                            .padding(8.dp)
+                    ) {
+                        items(imageUrls) { url ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Remove URL",
-                                    tint = BlackWhiteTheme.error
+                                // Image preview thumbnail
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(url)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Image preview",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
+                                
+                                // URL text
+                                Text(
+                                    text = url,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                
+                                // Remove button
+                                IconButton(
+                                    onClick = {
+                                        imageUrls = imageUrls.filter { it != url }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Remove URL",
+                                        tint = BlackWhiteTheme.error
+                                    )
+                                }
+                            }
+                            
+                            Divider(
+                                color = BlackWhiteTheme.divider,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                    }
+                    
+                    // Show loading indicator when uploading
+                    if (isUploading) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(BlackWhiteTheme.surface.copy(alpha = 0.7f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CircularProgressIndicator(color = BlackWhiteTheme.primary)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Uploading image...", color = BlackWhiteTheme.primary)
                             }
                         }
                     }
@@ -927,7 +1078,7 @@ fun AddChapterDialog(
                             containerColor = BlackWhiteTheme.primary,
                             contentColor = BlackWhiteTheme.onPrimary
                         ),
-                        enabled = chapterNumber.isNotEmpty() && imageUrls.isNotEmpty()
+                        enabled = chapterNumber.isNotEmpty() && imageUrls.isNotEmpty() && !isUploading
                     ) {
                         Text("Add Chapter")
                     }
@@ -941,46 +1092,79 @@ fun AddChapterDialog(
 @Composable
 fun AddMangaDialog(
     onDismiss: () -> Unit,
-    onAdd: (title: String, description: String, coverUrl: String, status: String, tagIds: List<String>) -> Unit,
+    onAdd: (title: String, description: String, coverUrl: String, status: String, author: String, tagIds: List<String>) -> Unit,
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var coverUrl by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("ongoing") }
+    var author by remember { mutableStateOf("") }
     
-    // Sử dụng Set để lưu trữ các tagId đã chọn
-    var selectedTagIds by remember { mutableStateOf(setOf<String>()) }
-
-    val statusOptions = listOf("ongoing", "completed", "hiatus", "cancelled")
-    var statusMenuExpanded by remember { mutableStateOf(false) }
+    // For image upload
+    var showImagePicker by remember { mutableStateOf(false) }
+    val isUploading by viewModel.isUploading.collectAsState()
+    val uploadedImageUrl by viewModel.uploadedImageUrl.collectAsState()
+    val context = LocalContext.current
     
-    // Lấy danh sách tags từ ViewModel
-    val firestoreTags by viewModel.firestoreTags.collectAsState()
-    
-    // Nhóm tags theo group để hiển thị
-    val groupedTags = firestoreTags.groupBy { it.group }
-
-    // Đảm bảo tags đã được load
-    LaunchedEffect(Unit) {
-        if (firestoreTags.isEmpty()) {
-            viewModel.fetchTagsFromFirestore()
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Launch coroutine to handle the upload
+            val scope = CoroutineScope(Dispatchers.Main)
+            scope.launch {
+                viewModel.uploadMangaCover(it).collect { result ->
+                    when (result) {
+                        is AdminViewModel.Result.Success -> {
+                            coverUrl = result.data
+                            Toast.makeText(context, "Cover uploaded successfully", Toast.LENGTH_SHORT).show()
+                        }
+                        is AdminViewModel.Result.Failure -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                        }
+                        is AdminViewModel.Result.Loading -> {
+                            // Could update a progress indicator here
+                        }
+                    }
+                }
+            }
         }
     }
-
+    
+    // Update coverUrl when uploadedImageUrl changes
+    LaunchedEffect(uploadedImageUrl) {
+        uploadedImageUrl?.let {
+            coverUrl = it
+        }
+    }
+    
+    // Selected tagIds
+    var selectedTagIds by remember { mutableStateOf(setOf<String>()) }
+    
+    // Get tags from viewModel
+    val tags by viewModel.firestoreTags.collectAsState()
+    
+    // Reset upload state when dialog is dismissed
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.resetUploadState()
+        }
+    }
+    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f)
-                .padding(16.dp),
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(16.dp),
             color = BlackWhiteTheme.surface,
             border = BorderStroke(1.dp, BlackWhiteTheme.border)
@@ -990,35 +1174,23 @@ fun AddMangaDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Header with title and close button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Add New Manga",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = BlackWhiteTheme.onSurface
-                    )
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = BlackWhiteTheme.iconTint
-                        )
-                    }
-                }
-
+                // Title
+                Text(
+                    text = "Add New Manga",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Scrollable content
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
+                        .weight(1f)
                 ) {
-                    // Title
+                    // Title field
                     item {
                         OutlinedTextField(
                             value = title,
@@ -1033,11 +1205,11 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Description
+                    
+                    // Description field
                     item {
                         OutlinedTextField(
                             value = description,
@@ -1054,16 +1226,165 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Cover URL
+                    
+                    // Cover image section
+                    item {
+                        Text(
+                            text = "Cover Image",
+                            fontWeight = FontWeight.Medium,
+                            color = BlackWhiteTheme.onSurface
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Cover image preview
+                            Box(
+                                modifier = Modifier
+                                    .size(100.dp, 150.dp)
+                                    .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(BlackWhiteTheme.background)
+                            ) {
+                                if (coverUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(coverUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "Cover preview",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "No image",
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .align(Alignment.Center),
+                                        tint = BlackWhiteTheme.divider
+                                    )
+                                }
+                                
+                                // Show loading indicator when uploading
+                                if (isUploading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            color = BlackWhiteTheme.primary,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Upload button
+                                Button(
+                                    onClick = { imagePickerLauncher.launch("image/*") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = BlackWhiteTheme.primary,
+                                        contentColor = BlackWhiteTheme.onPrimary
+                                    ),
+                                    enabled = !isUploading
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Upload"
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Upload Cover")
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // URL input field
+                                OutlinedTextField(
+                                    value = coverUrl,
+                                    onValueChange = { coverUrl = it },
+                                    label = { Text("Cover URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        cursorColor = BlackWhiteTheme.primary,
+                                        focusedBorderColor = BlackWhiteTheme.primary,
+                                        unfocusedBorderColor = BlackWhiteTheme.border,
+                                        focusedLabelColor = BlackWhiteTheme.primary,
+                                        unfocusedLabelColor = BlackWhiteTheme.border
+                                    )
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Status dropdown
+                    item {
+                        Text(
+                            text = "Status",
+                            fontWeight = FontWeight.Medium,
+                            color = BlackWhiteTheme.onSurface
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Status options
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            StatusOption(
+                                text = "Ongoing",
+                                selected = status == "ongoing",
+                                onClick = { status = "ongoing" }
+                            )
+                            
+                            StatusOption(
+                                text = "Completed",
+                                selected = status == "completed",
+                                onClick = { status = "completed" }
+                            )
+                            
+                            StatusOption(
+                                text = "Hiatus",
+                                selected = status == "hiatus",
+                                onClick = { status = "hiatus" }
+                            )
+                            
+                            StatusOption(
+                                text = "Cancelled",
+                                selected = status == "cancelled",
+                                onClick = { status = "cancelled" }
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Author field
                     item {
                         OutlinedTextField(
-                            value = coverUrl,
-                            onValueChange = { coverUrl = it },
-                            label = { Text("Cover Image URL") },
+                            value = author,
+                            onValueChange = { author = it },
+                            label = { Text("Author(s)") },
+                            placeholder = { Text("Separate multiple authors with commas") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.outlinedTextFieldColors(
                                 cursorColor = BlackWhiteTheme.primary,
@@ -1073,95 +1394,41 @@ fun AddMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Status dropdown
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = status,
-                                onValueChange = { },
-                                label = { Text("Status") },
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
-                                trailingIcon = {
-                                    IconButton(onClick = { statusMenuExpanded = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = "Select Status",
-                                            tint = BlackWhiteTheme.iconTint
-                                        )
-                                    }
-                                },
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    cursorColor = BlackWhiteTheme.primary,
-                                    focusedBorderColor = BlackWhiteTheme.primary,
-                                    unfocusedBorderColor = BlackWhiteTheme.border,
-                                    focusedLabelColor = BlackWhiteTheme.primary,
-                                    unfocusedLabelColor = BlackWhiteTheme.border
-                                )
-                            )
-
-                            DropdownMenu(
-                                expanded = statusMenuExpanded,
-                                onDismissRequest = { statusMenuExpanded = false },
-                                modifier = Modifier.background(BlackWhiteTheme.surface)
-                            ) {
-                                statusOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, color = BlackWhiteTheme.onSurface) },
-                                        onClick = {
-                                            status = option
-                                            statusMenuExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
+                    
                     // Tags section
                     item {
                         Text(
                             text = "Tags",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text(
-                            text = "Selected tags: ${selectedTagIds.size}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
-                        )
+                        // Group tags by category
+                        val groupedTags = tags.groupBy { it.group }
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    
-                    // Display tags grouped by category
-                    groupedTags.forEach { (group, tagsInGroup) ->
-                        item {
+                        groupedTags.forEach { (group, tagsInGroup) ->
                             Text(
                                 text = group.capitalize(),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = BlackWhiteTheme.onSurface,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
                             )
                             
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
                             FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTagIds.contains(tag.id)
+                                    
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = {
@@ -1171,19 +1438,11 @@ fun AddMangaDialog(
                                                 selectedTagIds + tag.id
                                             }
                                         },
-                                        label = {
-                                            Text(
-                                                text = tag.name,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontSize = 12.sp
-                                            )
-                                        },
+                                        label = { Text(tag.name) },
                                         colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = if (isSelected) BlackWhiteTheme.primary else BlackWhiteTheme.surface,
-                                            labelColor = if (isSelected) BlackWhiteTheme.onPrimary else BlackWhiteTheme.onSurface
-                                        ),
-
+                                            selectedContainerColor = BlackWhiteTheme.primary,
+                                            selectedLabelColor = BlackWhiteTheme.onPrimary
+                                        )
                                     )
                                 }
                             }
@@ -1192,18 +1451,20 @@ fun AddMangaDialog(
                         }
                     }
                 }
-
-                // Action buttons
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
                     // Cancel button
                     OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            viewModel.resetUploadState() // Reset upload state when canceling
+                            onDismiss()
+                        },
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = BlackWhiteTheme.primary
                         ),
@@ -1213,19 +1474,20 @@ fun AddMangaDialog(
                     ) {
                         Text("Cancel")
                     }
-
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
                     // Add button
                     Button(
                         onClick = {
-                            onAdd(title, description, coverUrl, status, selectedTagIds.toList())
-                            onDismiss()
+                            onAdd(title, description, coverUrl, status, author, selectedTagIds.toList())
+                            viewModel.resetUploadState() // Reset upload state after adding
                         },
-                        modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BlackWhiteTheme.primary,
                             contentColor = BlackWhiteTheme.onPrimary
                         ),
-                        enabled = title.isNotEmpty() && coverUrl.isNotEmpty()
+                        enabled = title.isNotEmpty() && coverUrl.isNotEmpty() && !isUploading
                     ) {
                         Text("Add Manga")
                     }
@@ -1235,18 +1497,40 @@ fun AddMangaDialog(
     }
 }
 
+@Composable
+fun StatusOption(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) BlackWhiteTheme.primary else BlackWhiteTheme.surface,
+        border = BorderStroke(1.dp, if (selected) BlackWhiteTheme.primary else BlackWhiteTheme.border)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            color = if (selected) BlackWhiteTheme.onPrimary else BlackWhiteTheme.onSurface
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditMangaDialog(
     manga: MangaData,
     onDismiss: () -> Unit,
-    onSave: (title: String, description: String, coverUrl: String, status: String, tagIds: List<String>) -> Unit,
+    onSave: (title: String, description: String, coverUrl: String, status: String, author: String, tagIds: List<String>) -> Unit,
     viewModel: AdminViewModel = hiltViewModel()
 ) {
     val initialTitle = manga.attributes.title["en"] ?: ""
     val initialDescription = manga.attributes.description["en"] ?: ""
     val initialCoverUrl = manga.relationships.find { it.type == "cover_art" }?.attributes?.fileName ?: ""
     val initialStatus = manga.attributes.status ?: "ongoing"
+    val initialAuthor = manga.attributes.author ?: ""
     
     // Lấy danh sách tagIds từ manga
     val initialTagIds = manga.attributes.tags.map { it.id }
@@ -1255,39 +1539,71 @@ fun EditMangaDialog(
     var description by remember { mutableStateOf(initialDescription) }
     var coverUrl by remember { mutableStateOf(initialCoverUrl) }
     var status by remember { mutableStateOf(initialStatus) }
+    var author by remember { mutableStateOf(initialAuthor) }
     
-    // Sử dụng Set để lưu trữ các tagId đã chọn
-    var selectedTagIds by remember { mutableStateOf(initialTagIds.toSet()) }
-
-    val statusOptions = listOf("ongoing", "completed", "hiatus", "cancelled")
-    var statusMenuExpanded by remember { mutableStateOf(false) }
+    // For image upload
+    val isUploading by viewModel.isUploading.collectAsState()
+    val uploadedImageUrl by viewModel.uploadedImageUrl.collectAsState()
+    val context = LocalContext.current
     
-    // Lấy danh sách tags từ ViewModel
-    val firestoreTags by viewModel.firestoreTags.collectAsState()
-    
-    // Nhóm tags theo group để hiển thị
-    val groupedTags = firestoreTags.groupBy { it.group }
-
-    // Đảm bảo tags đã được load
-    LaunchedEffect(Unit) {
-        if (firestoreTags.isEmpty()) {
-            viewModel.fetchTagsFromFirestore()
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Launch coroutine to handle the upload
+            val scope = CoroutineScope(Dispatchers.Main)
+            scope.launch {
+                viewModel.uploadMangaCover(it).collect { result ->
+                    when (result) {
+                        is AdminViewModel.Result.Success -> {
+                            coverUrl = result.data
+                            Toast.makeText(context, "Cover uploaded successfully", Toast.LENGTH_SHORT).show()
+                        }
+                        is AdminViewModel.Result.Failure -> {
+                            Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                        }
+                        is AdminViewModel.Result.Loading -> {
+                            // Could update a progress indicator here
+                        }
+                    }
+                }
+            }
         }
     }
-
+    
+    // Update coverUrl when uploadedImageUrl changes
+    LaunchedEffect(uploadedImageUrl) {
+        uploadedImageUrl?.let {
+            coverUrl = it
+        }
+    }
+    
+    // Selected tagIds
+    var selectedTagIds by remember { mutableStateOf(initialTagIds.toSet()) }
+    
+    // Get tags from viewModel
+    val tags by viewModel.firestoreTags.collectAsState()
+    
+    // Reset upload state when dialog is dismissed
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.resetUploadState()
+        }
+    }
+    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f)
-                .padding(16.dp),
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.9f),
             shape = RoundedCornerShape(16.dp),
             color = BlackWhiteTheme.surface,
             border = BorderStroke(1.dp, BlackWhiteTheme.border)
@@ -1297,35 +1613,23 @@ fun EditMangaDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Header with title and close button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Edit Manga",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = BlackWhiteTheme.onSurface
-                    )
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = BlackWhiteTheme.iconTint
-                        )
-                    }
-                }
-
+                // Title
+                Text(
+                    text = "Edit Manga",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = BlackWhiteTheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Scrollable content
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
+                        .weight(1f)
                 ) {
-                    // Title
+                    // Title field
                     item {
                         OutlinedTextField(
                             value = title,
@@ -1340,11 +1644,11 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Description
+                    
+                    // Description field
                     item {
                         OutlinedTextField(
                             value = description,
@@ -1361,16 +1665,165 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Cover URL
+                    
+                    // Cover image section
+                    item {
+                        Text(
+                            text = "Cover Image",
+                            fontWeight = FontWeight.Medium,
+                            color = BlackWhiteTheme.onSurface
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Cover image preview
+                            Box(
+                                modifier = Modifier
+                                    .size(100.dp, 150.dp)
+                                    .border(1.dp, BlackWhiteTheme.border, RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(BlackWhiteTheme.background)
+                            ) {
+                                if (coverUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(coverUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "Cover preview",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "No image",
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .align(Alignment.Center),
+                                        tint = BlackWhiteTheme.divider
+                                    )
+                                }
+                                
+                                // Show loading indicator when uploading
+                                if (isUploading) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.5f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            color = BlackWhiteTheme.primary,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Upload button
+                                Button(
+                                    onClick = { imagePickerLauncher.launch("image/*") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = BlackWhiteTheme.primary,
+                                        contentColor = BlackWhiteTheme.onPrimary
+                                    ),
+                                    enabled = !isUploading
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Upload"
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Upload Cover")
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // URL input field
+                                OutlinedTextField(
+                                    value = coverUrl,
+                                    onValueChange = { coverUrl = it },
+                                    label = { Text("Cover URL") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        cursorColor = BlackWhiteTheme.primary,
+                                        focusedBorderColor = BlackWhiteTheme.primary,
+                                        unfocusedBorderColor = BlackWhiteTheme.border,
+                                        focusedLabelColor = BlackWhiteTheme.primary,
+                                        unfocusedLabelColor = BlackWhiteTheme.border
+                                    )
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Status dropdown
+                    item {
+                        Text(
+                            text = "Status",
+                            fontWeight = FontWeight.Medium,
+                            color = BlackWhiteTheme.onSurface
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Status options
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            StatusOption(
+                                text = "Ongoing",
+                                selected = status == "ongoing",
+                                onClick = { status = "ongoing" }
+                            )
+                            
+                            StatusOption(
+                                text = "Completed",
+                                selected = status == "completed",
+                                onClick = { status = "completed" }
+                            )
+                            
+                            StatusOption(
+                                text = "Hiatus",
+                                selected = status == "hiatus",
+                                onClick = { status = "hiatus" }
+                            )
+                            
+                            StatusOption(
+                                text = "Cancelled",
+                                selected = status == "cancelled",
+                                onClick = { status = "cancelled" }
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Author field
                     item {
                         OutlinedTextField(
-                            value = coverUrl,
-                            onValueChange = { coverUrl = it },
-                            label = { Text("Cover Image URL") },
+                            value = author,
+                            onValueChange = { author = it },
+                            label = { Text("Author(s)") },
+                            placeholder = { Text("Separate multiple authors with commas") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.outlinedTextFieldColors(
                                 cursorColor = BlackWhiteTheme.primary,
@@ -1380,95 +1833,41 @@ fun EditMangaDialog(
                                 unfocusedLabelColor = BlackWhiteTheme.border
                             )
                         )
-
+                        
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    // Status dropdown
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = status,
-                                onValueChange = { },
-                                label = { Text("Status") },
-                                modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
-                                trailingIcon = {
-                                    IconButton(onClick = { statusMenuExpanded = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = "Select Status",
-                                            tint = BlackWhiteTheme.iconTint
-                                        )
-                                    }
-                                },
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    cursorColor = BlackWhiteTheme.primary,
-                                    focusedBorderColor = BlackWhiteTheme.primary,
-                                    unfocusedBorderColor = BlackWhiteTheme.border,
-                                    focusedLabelColor = BlackWhiteTheme.primary,
-                                    unfocusedLabelColor = BlackWhiteTheme.border
-                                )
-                            )
-
-                            DropdownMenu(
-                                expanded = statusMenuExpanded,
-                                onDismissRequest = { statusMenuExpanded = false },
-                                modifier = Modifier.background(BlackWhiteTheme.surface)
-                            ) {
-                                statusOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, color = BlackWhiteTheme.onSurface) },
-                                        onClick = {
-                                            status = option
-                                            statusMenuExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
+                    
                     // Tags section
                     item {
                         Text(
                             text = "Tags",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             color = BlackWhiteTheme.onSurface
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text(
-                            text = "Selected tags: ${selectedTagIds.size}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
-                        )
+                        // Group tags by category
+                        val groupedTags = tags.groupBy { it.group }
                         
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    
-                    // Display tags grouped by category
-                    groupedTags.forEach { (group, tagsInGroup) ->
-                        item {
+                        groupedTags.forEach { (group, tagsInGroup) ->
                             Text(
                                 text = group.capitalize(),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = BlackWhiteTheme.onSurface,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = BlackWhiteTheme.onSurface.copy(alpha = 0.7f)
                             )
                             
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
                             FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 tagsInGroup.forEach { tag ->
                                     val isSelected = selectedTagIds.contains(tag.id)
+                                    
                                     FilterChip(
                                         selected = isSelected,
                                         onClick = {
@@ -1478,19 +1877,11 @@ fun EditMangaDialog(
                                                 selectedTagIds + tag.id
                                             }
                                         },
-                                        label = {
-                                            Text(
-                                                text = tag.name,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontSize = 12.sp
-                                            )
-                                        },
+                                        label = { Text(tag.name) },
                                         colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = if (isSelected) BlackWhiteTheme.primary else BlackWhiteTheme.surface,
-                                            labelColor = if (isSelected) BlackWhiteTheme.onPrimary else BlackWhiteTheme.onSurface
-                                        ),
-
+                                            selectedContainerColor = BlackWhiteTheme.primary,
+                                            selectedLabelColor = BlackWhiteTheme.onPrimary
+                                        )
                                     )
                                 }
                             }
@@ -1499,18 +1890,20 @@ fun EditMangaDialog(
                         }
                     }
                 }
-
-                // Action buttons
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
                     // Cancel button
                     OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            viewModel.resetUploadState() // Reset upload state when canceling
+                            onDismiss()
+                        },
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = BlackWhiteTheme.primary
                         ),
@@ -1520,19 +1913,21 @@ fun EditMangaDialog(
                     ) {
                         Text("Cancel")
                     }
-
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
                     // Save button
                     Button(
                         onClick = {
-                            onSave(title, description, coverUrl, status, selectedTagIds.toList())
-                            onDismiss()
+                            onSave(title, description, coverUrl, status, author, selectedTagIds.toList())
+                            viewModel.resetUploadState() // Reset upload state after saving
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BlackWhiteTheme.primary,
                             contentColor = BlackWhiteTheme.onPrimary
                         ),
-                        enabled = title.isNotEmpty() && coverUrl.isNotEmpty()
+                        enabled = title.isNotEmpty() && coverUrl.isNotEmpty() && !isUploading
                     ) {
                         Text("Save Changes")
                     }
@@ -1541,6 +1936,20 @@ fun EditMangaDialog(
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

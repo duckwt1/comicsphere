@@ -78,7 +78,8 @@ class FavouriteRepositoryImp @Inject constructor(
                     status = mangaDoc.getString("status") ?: "",
                     availableTranslatedLanguages = listOf("en"),
                     altTitles = emptyList(),
-                    tags = emptyList()
+                    tags = emptyList(),
+                    author = mangaDoc.getString("author") ?: "",
                 ),
                 relationships = listOf(
                     Relationship(

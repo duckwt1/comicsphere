@@ -20,7 +20,6 @@ import com.android.dacs3.data.model.Relationship
 import com.android.dacs3.data.model.RelationshipAttributes
 import com.android.dacs3.data.model.Tag
 import com.android.dacs3.data.model.TagAttributes
-import com.android.dacs3.data.model.TagData
 import com.android.dacs3.data.model.TagWrapper
 import com.android.dacs3.data.model.User
 import com.google.firebase.auth.FirebaseAuth
@@ -39,43 +38,6 @@ class MangaRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : MangaRepository {
 
-
-    override suspend fun fetchMangaList(limit: Int, offset: Int): Result<MangaListResponse> {
-        return try {
-            val response = api.getMangaList(limit, offset)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun searchManga(title: String): Result<MangaListResponse> {
-        return try {
-            val response = api.searchManga(title)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun getTags(): Result<List<TagWrapper>> {
-        return try {
-            val response = api.getTags()
-            Result.success(response.data)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun getMangaById(id: String): Result<MangaDetailResponse> {
-        return try {
-            val response = api.getMangaById(id)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
     override suspend fun getMangaChapters(
         mangaId: String,
         language: String,
@@ -85,15 +47,6 @@ class MangaRepositoryImpl @Inject constructor(
         return try {
             val response = api.getMangaChapters(mangaId, listOf(language), "asc", limit, offset)
             Result.success(response.data)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun getChapterContent(chapterId: String): Result<ChapterContentResponse> {
-        return try {
-            val response = api.getChapterContent(chapterId)
-            Result.success(response)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -181,7 +134,7 @@ class MangaRepositoryImpl @Inject constructor(
             Log.d("MangaRepositoryImpl", "Found ${querySnapshot.documents.size} reading progress documents")
 
             val progressList = querySnapshot.documents.mapNotNull { doc ->
-                try {
+                  try {
                     val mangaId = doc.getString("mangaId")
                     val chapterId = doc.getString("chapterId")
                     val language = doc.getString("language")
@@ -262,57 +215,6 @@ class MangaRepositoryImpl @Inject constructor(
             Result.success(true)
         } catch (e: Exception) {
             Log.e("MangaRepositoryImpl", "Error deleting all reading progress", e)
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun fetchTrendingManga(limit: Int, offset: Int): Result<MangaListResponse> {
-        return try {
-            val response = api.getTrendingManga(
-                limit = limit,
-                offset = offset,
-                order = "desc"
-            )
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-
-    override suspend fun fetchRecommendedManga(
-        includedTagIds: List<String>,
-        limit: Int,
-        offset: Int
-    ): Result<MangaListResponse> {
-        return try {
-            val response = api.getRecommendedManga(
-                limit = limit,
-                offset = offset,
-                includedTags = includedTagIds,
-                includedTagsMode = "OR"
-            )
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun getMangaByTags(
-        includedTags: List<String>,
-        includedTagsMode: String,
-        limit: Int,
-        offset: Int
-    ): Result<MangaListResponse> {
-        return try {
-            val response = api.getMangaByTags(
-                includedTags = includedTags,
-                includedTagsMode = includedTagsMode,
-                limit = limit,
-                offset = offset
-            )
-            Result.success(response)
-        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -455,66 +357,6 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
-
-    override suspend fun likeComment(mangaId: String, commentId: String, userId: String): Result<Boolean> {
-        return try {
-            val likeDocRef = firestore.collection("commentLikes")
-                .document("${userId}_$commentId")
-            
-            val commentRef = firestore.collection("manga")
-                .document(mangaId)
-                .collection("comments")
-                .document(commentId)
-            
-            val likeDoc = likeDocRef.get().await()
-            
-            if (likeDoc.exists()) {
-                // Unlike
-                likeDocRef.delete().await()
-                
-                firestore.runTransaction { transaction ->
-                    val comment = transaction.get(commentRef)
-                    val currentLikes = comment.getLong("likes") ?: 0
-                    transaction.update(commentRef, "likes", maxOf(0, currentLikes - 1))
-                }.await()
-            } else {
-                // Like
-                val likeData = hashMapOf(
-                    "userId" to userId,
-                    "commentId" to commentId,
-                    "timestamp" to System.currentTimeMillis()
-                )
-                
-                likeDocRef.set(likeData).await()
-                
-                firestore.runTransaction { transaction ->
-                    val comment = transaction.get(commentRef)
-                    val currentLikes = comment.getLong("likes") ?: 0
-                    transaction.update(commentRef, "likes", currentLikes + 1)
-                }.await()
-            }
-            
-            Result.success(true)
-        } catch (e: Exception) {
-            Log.e("MangaRepositoryImpl", "Error liking/unliking comment", e)
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun checkIfUserLikedComment(commentId: String, userId: String): Result<Boolean> {
-        return try {
-            val likeDoc = firestore.collection("commentLikes")
-                .document("${userId}_$commentId")
-                .get()
-                .await()
-            
-            Result.success(likeDoc.exists())
-        } catch (e: Exception) {
-            Log.e("MangaRepositoryImpl", "Error checking if user liked comment", e)
-            Result.failure(e)
-        }
-    }
-
     override suspend fun getUserInfo(userId: String): Result<User> {
         return try {
             val document = FirebaseFirestore.getInstance()
@@ -592,20 +434,100 @@ class MangaRepositoryImpl @Inject constructor(
 
     override suspend fun fetchTrendingMangaFromFirestore(limit: Int): Result<List<MangaData>> {
         return try {
-            Log.d("MangaRepositoryImpl", "Fetching trending manga from Firestore")
+            Log.d("MangaRepositoryImpl", "Fetching trending manga from Firestore with limit: $limit")
             
             // Lấy danh sách tags trước
             val tagsResult = getTagsFromFirestore()
             val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
             
-            // Truy vấn manga được sắp xếp theo viewCount (giảm dần)
-            val querySnapshot = firestore.collection("manga")
-                .orderBy("viewCount", Query.Direction.DESCENDING)
-                .limit(limit.toLong())
-                .get()
-                .await()
+            // Lấy dữ liệu từ Firestore
+            val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+            
+            // Kiểm tra xem có manga nào có trường viewCount không
+            val testQuery = mangaCollection.whereGreaterThanOrEqualTo("viewCount", 0).limit(1)
+            val testResult = testQuery.get().await()
+            
+            // Nếu không có manga nào có trường viewCount, lấy tất cả manga và sắp xếp theo lastUpdated
+            val query = if (testResult.isEmpty) {
+                Log.d("MangaRepositoryImpl", "No manga with viewCount field found, using lastUpdated instead")
+                mangaCollection.orderBy("lastUpdated", Query.Direction.DESCENDING)
+                    .limit(limit.toLong())
+            } else {
+                mangaCollection.orderBy("viewCount", Query.Direction.DESCENDING)
+                    .limit(limit.toLong())
+            }
+            
+            val querySnapshot = query.get().await()
             
             Log.d("MangaRepositoryImpl", "Fetched ${querySnapshot.documents.size} trending manga documents")
+            
+            // Chuyển đổi dữ liệu Firestore thành MangaData
+            val mangaList = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    // Log thông tin viewCount để debug
+                    val viewCount = document.getLong("viewCount") ?: 0
+                    Log.d("MangaRepositoryImpl", "Manga ${document.id} has viewCount: $viewCount")
+                    
+                    convertFirestoreDocumentToMangaData(document, tagMap)
+                } catch (e: Exception) {
+                    Log.e("MangaRepositoryImpl", "Error parsing manga document: ${document.id}", e)
+                    null
+                }
+            }
+            
+            // Nếu không có kết quả, thử lấy tất cả manga
+            if (mangaList.isEmpty()) {
+                Log.d("MangaRepositoryImpl", "No trending manga found, fetching all manga instead")
+                return fetchMangaListFromFirestore(true, limit)
+            }
+            
+            Log.d("MangaRepositoryImpl", "Loaded ${mangaList.size} trending manga from Firestore")
+            Result.success(mangaList)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error loading trending manga", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun fetchRecommendedMangaFromFirestore(
+        includedTagIds: List<String>?,
+        limit: Int
+    ): Result<List<MangaData>> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Fetching recommended manga from Firestore with limit: $limit")
+            Log.d("MangaRepositoryImpl", "Included tag IDs: ${includedTagIds?.joinToString() ?: "none"}")
+            
+            // Lấy danh sách tags trước
+            val tagsResult = getTagsFromFirestore()
+            val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
+            
+            // Lấy dữ liệu từ Firestore
+            val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+            
+            // Nếu có tagIds, lọc theo tags
+            val query = if (!includedTagIds.isNullOrEmpty()) {
+                // Kiểm tra xem có manga nào có trường tagIds không
+                val testQuery = mangaCollection.whereArrayContainsAny("tagIds", includedTagIds).limit(1)
+                val testResult = testQuery.get().await()
+                
+                if (testResult.isEmpty) {
+                    Log.d("MangaRepositoryImpl", "No manga with matching tagIds found, using lastUpdated instead")
+                    mangaCollection.orderBy("lastUpdated", Query.Direction.DESCENDING)
+                        .limit(limit.toLong())
+                } else {
+                    mangaCollection.whereArrayContainsAny("tagIds", includedTagIds)
+                        .limit(limit.toLong())
+                }
+            } else {
+                // Nếu không có tags, lấy manga theo viewCount (trending)
+                Log.d("MangaRepositoryImpl", "No tags provided, using viewCount instead")
+                mangaCollection.orderBy("viewCount", Query.Direction.DESCENDING)
+                    .limit(limit.toLong())
+            }
+            
+            val querySnapshot = query.get().await()
+            
+            Log.d("MangaRepositoryImpl", "Fetched ${querySnapshot.documents.size} recommended manga documents")
             
             // Chuyển đổi dữ liệu Firestore thành MangaData
             val mangaList = querySnapshot.documents.mapNotNull { document ->
@@ -617,103 +539,16 @@ class MangaRepositoryImpl @Inject constructor(
                 }
             }
             
+            // Nếu không có kết quả, thử lấy tất cả manga
+            if (mangaList.isEmpty()) {
+                Log.d("MangaRepositoryImpl", "No recommended manga found, fetching all manga instead")
+                return fetchMangaListFromFirestore(true, limit)
+            }
+            
+            Log.d("MangaRepositoryImpl", "Loaded ${mangaList.size} recommended manga from Firestore")
             Result.success(mangaList)
         } catch (e: Exception) {
-            Log.e("MangaRepositoryImpl", "Error fetching trending manga from Firestore", e)
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun fetchRecommendedMangaFromFirestore(
-        userId: String,
-        includedTagIds: List<String>?,
-        limit: Int
-    ): Result<List<MangaData>> {
-        return try {
-            Log.d("MangaRepositoryImpl", "Fetching recommended manga from Firestore")
-            
-            // Lấy danh sách tags trước
-            val tagsResult = getTagsFromFirestore()
-            val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
-            
-            // Nếu có tagIds được chỉ định, sử dụng chúng
-            val tagsToUse = if (!includedTagIds.isNullOrEmpty()) {
-                includedTagIds
-            } else {
-                // Nếu không, lấy tags từ lịch sử đọc của người dùng
-                try {
-                    // Lấy lịch sử đọc của người dùng
-                    val readingProgressSnapshot = firestore.collection("users")
-                        .document(userId)
-                        .collection("readingProgress")
-                        .orderBy("timestamp", Query.Direction.DESCENDING)
-                        .limit(10)
-                        .get()
-                        .await()
-                    
-                    // Lấy mangaIds từ lịch sử đọc
-                    val mangaIds = readingProgressSnapshot.documents
-                        .mapNotNull { it.getString("mangaId") }
-                        .distinct()
-                    
-                    // Lấy thông tin manga
-                    val tagFrequency = mutableMapOf<String, Int>()
-                    
-                    for (mangaId in mangaIds) {
-                        val mangaDoc = firestore.collection("manga")
-                            .document(mangaId)
-                            .get()
-                            .await()
-                        
-                        // Lấy tagIds từ manga
-                        val mangaTagIds = mangaDoc.get("tagIds") as? List<String> ?: emptyList()
-                        
-                        // Tăng tần suất của mỗi tag
-                        mangaTagIds.forEach { tagId ->
-                            tagFrequency[tagId] = (tagFrequency[tagId] ?: 0) + 1
-                        }
-                    }
-                    
-                    // Lấy 5 tag phổ biến nhất
-                    tagFrequency.entries
-                        .sortedByDescending { it.value }
-                        .take(5)
-                        .map { it.key }
-                } catch (e: Exception) {
-                    Log.e("MangaRepositoryImpl", "Error getting tags from reading history", e)
-                    emptyList()
-                }
-            }
-            
-            Log.d("MangaRepositoryImpl", "Using tags for recommendations: $tagsToUse")
-            
-            // Nếu không có tags, trả về manga mới nhất
-            if (tagsToUse.isEmpty()) {
-                return fetchMangaListFromFirestore(limit)
-            }
-            
-            // Truy vấn manga có chứa ít nhất một trong các tag
-            val mangaSnapshot = firestore.collection("manga")
-                .whereArrayContainsAny("tagIds", tagsToUse)
-                .limit(limit.toLong())
-                .get()
-                .await()
-            
-            Log.d("MangaRepositoryImpl", "Fetched ${mangaSnapshot.documents.size} recommended manga documents")
-            
-            // Chuyển đổi dữ liệu Firestore thành MangaData
-            val mangaList = mangaSnapshot.documents.mapNotNull { document ->
-                try {
-                    convertFirestoreDocumentToMangaData(document, tagMap)
-                } catch (e: Exception) {
-                    Log.e("MangaRepositoryImpl", "Error parsing manga document: ${document.id}", e)
-                    null
-                }
-            }
-            
-            Result.success(mangaList)
-        } catch (e: Exception) {
-            Log.e("MangaRepositoryImpl", "Error fetching recommended manga from Firestore", e)
+            Log.e("MangaRepositoryImpl", "Error loading recommended manga", e)
             Result.failure(e)
         }
     }
@@ -724,6 +559,9 @@ class MangaRepositoryImpl @Inject constructor(
         tagMap: Map<String, Tag>
     ): MangaData {
         val id = document.id
+        
+        // Log toàn bộ dữ liệu của document để debug
+        Log.d("MangaRepositoryImpl", "Converting document ${document.id}")
         
         // Ưu tiên coverImageUrl
         val coverImageUrl = document.getString("coverImageUrl") ?: ""
@@ -741,6 +579,27 @@ class MangaRepositoryImpl @Inject constructor(
             ?: mapOf("en" to (document.getString("title") ?: "Unknown"))
         val description = document.getString("description") ?: ""
         val status = document.getString("status") ?: ""
+        
+        // Xử lý author - có thể là String hoặc List<String>
+        val authorRaw = document.get("authors")
+        Log.d("MangaRepositoryImpl", "Raw author data for ${document.id}: $authorRaw (type: ${authorRaw?.javaClass?.simpleName})")
+        
+        val author = when (authorRaw) {
+            is String -> authorRaw.takeIf { it.isNotEmpty() } ?: "Unknown Author"
+            is List<*> -> {
+                val authorList = authorRaw.filterIsInstance<String>()
+                if (authorList.isEmpty()) "Unknown Author" else authorList.joinToString(", ")
+            }
+            else -> {
+                Log.e("MangaRepositoryImpl", "Author field is missing or has unexpected type for manga ${document.id}")
+                "Unknown Author"
+            }
+        }
+        
+        Log.d("MangaRepositoryImpl", "Processed author for manga ${document.id}: $author")
+        
+        // Xử lý availableTranslatedLanguages
+        val availableLanguages = (document.get("availableLanguages") as? List<String>) ?: listOf("en")
         
         // Xử lý tags
         val tagIds = document.get("tagIds") as? List<String> ?: emptyList()
@@ -764,9 +623,10 @@ class MangaRepositoryImpl @Inject constructor(
                 title = title,
                 description = mapOf("en" to description),
                 status = status,
-                availableTranslatedLanguages = listOf("en"),
+                availableTranslatedLanguages = availableLanguages,
                 altTitles = emptyList(),
-                tags = tags
+                tags = tags,
+                author = author
             ),
             relationships = listOf(
                 Relationship(
@@ -781,18 +641,22 @@ class MangaRepositoryImpl @Inject constructor(
     }
 
     // Thêm phương thức để lấy danh sách manga từ Firestore
-    private suspend fun fetchMangaListFromFirestore(limit: Int): Result<List<MangaData>> {
+    override suspend fun fetchMangaListFromFirestore(reset: Boolean, limit: Int): Result<List<MangaData>> {
         return try {
+            Log.d("MangaRepositoryImpl", "Fetching manga list from Firestore with limit: $limit")
+            
             // Lấy danh sách tags trước
             val tagsResult = getTagsFromFirestore()
             val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
             
-            // Truy vấn manga được sắp xếp theo thời gian cập nhật (giảm dần)
-            val querySnapshot = firestore.collection("manga")
-                .orderBy("lastUpdated", Query.Direction.DESCENDING)
+            // Lấy tất cả dữ liệu từ Firestore
+            val mangaCollection = FirebaseFirestore.getInstance().collection("manga")
+            val query = mangaCollection.orderBy("lastUpdated", Query.Direction.DESCENDING)
                 .limit(limit.toLong())
-                .get()
-                .await()
+            
+            val querySnapshot = query.get().await()
+            
+            Log.d("MangaRepositoryImpl", "Fetched ${querySnapshot.documents.size} manga documents from Firestore")
             
             // Chuyển đổi dữ liệu Firestore thành MangaData
             val mangaList = querySnapshot.documents.mapNotNull { document ->
@@ -804,9 +668,10 @@ class MangaRepositoryImpl @Inject constructor(
                 }
             }
             
+            Log.d("MangaRepositoryImpl", "Loaded ${mangaList.size} manga from Firestore")
             Result.success(mangaList)
         } catch (e: Exception) {
-            Log.e("MangaRepositoryImpl", "Error fetching manga list from Firestore", e)
+            Log.e("MangaRepositoryImpl", "Error loading manga list", e)
             Result.failure(e)
         }
     }
@@ -1195,42 +1060,182 @@ class MangaRepositoryImpl @Inject constructor(
         }
     }
 
-//    override suspend fun getLastReadChapter(userId: String, mangaId: String, language: String): Result<Pair<String, Int>?> {
-//        return try {
-//            // Sử dụng document ID pattern để truy vấn trực tiếp
-//            val progressCollection = firestore
-//                .collection("users")
-//                .document(userId)
-//                .collection("readingProgress")
-//                .whereGreaterThanOrEqualTo(FieldPath.documentId(), "${mangaId}_${language}_")
-//                .whereLessThanOrEqualTo(FieldPath.documentId(), "${mangaId}_${language}_\uf8ff")
-//                .get()
-//                .await()
-//
-//            if (progressCollection.documents.isEmpty()) {
-//                return Result.success(null)
-//            }
-//
-//            // Tìm document có timestamp mới nhất
-//            val progressDoc = progressCollection.documents.maxByOrNull {
-//                it.getLong("timestamp") ?: 0L
-//            }
-//
-//            if (progressDoc == null) {
-//                return Result.success(null)
-//            }
-//
-//            val chapterId = progressDoc.getString("chapterId")
-//            val lastPageIndex = progressDoc.getLong("lastPageIndex")?.toInt() ?: 1
-//
-//            if (chapterId == null) {
-//                return Result.success(null)
-//            }
-//
-//            Result.success(Pair(chapterId, lastPageIndex))
-//        } catch (e: Exception) {
-//            Log.e("MangaRepositoryImpl", "Error getting last read chapter", e)
-//            Result.failure(e)
-//        }
-//    }
+    override suspend fun searchMangaFromFirestore(title: String): Result<List<MangaData>> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Searching manga with title: $title")
+            
+            // Lấy danh sách tags trước
+            val tagsResult = getTagsFromFirestore()
+            val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
+            
+            // Lấy dữ liệu từ Firestore
+            val querySnapshot = firestore.collection("manga").get().await()
+            
+            // Lọc thủ công vì Firestore không hỗ trợ tìm kiếm text đầy đủ
+            val searchTermLower = title.lowercase()
+            
+            // Chuyển đổi dữ liệu Firestore thành MangaData và lọc theo title
+            val mangaList = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    val mangaTitle: Map<String, String> = (document.get("title") as? Map<String, String>) 
+                        ?: mapOf("en" to (document.getString("title") ?: "Unknown"))
+                    
+                    // Kiểm tra xem title có chứa search term không
+                    val titleMatches = mangaTitle.values.any { 
+                        it.lowercase().contains(searchTermLower) 
+                    }
+                    
+                    if (titleMatches) {
+                        convertFirestoreDocumentToMangaData(document, tagMap)
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    Log.e("MangaRepositoryImpl", "Error parsing manga document: ${document.id}", e)
+                    null
+                }
+            }
+            
+            Log.d("MangaRepositoryImpl", "Found ${mangaList.size} manga matching search term: $title")
+            Result.success(mangaList)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error searching manga", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getMangaDetailsFromFirestore(mangaId: String): Result<MangaData> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Loading manga details for $mangaId")
+            
+            // Lấy danh sách tags trước
+            val tagsResult = getTagsFromFirestore()
+            val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
+            
+            // Lấy dữ liệu manga từ Firestore
+            val mangaDoc = firestore.collection("manga").document(mangaId).get().await()
+            
+            if (!mangaDoc.exists()) {
+                return Result.failure(Exception("Manga not found"))
+            }
+            
+            // Log toàn bộ dữ liệu của document để debug
+            Log.d("MangaRepositoryImpl", "Manga document data: ${mangaDoc.data}")
+            
+            // Kiểm tra và cập nhật availableLanguages nếu cần
+            if (mangaDoc.get("availableLanguages") == null) {
+                // Nếu không có trường availableLanguages, thêm vào
+                firestore.collection("manga").document(mangaId)
+                    .update("availableLanguages", listOf("en"))
+                    .await()
+                
+                Log.d("MangaRepositoryImpl", "Added default availableLanguages field to manga $mangaId")
+            }
+            
+            // Kiểm tra và cập nhật author nếu cần
+            if (mangaDoc.get("authors") == null) {
+                // Nếu không có trường author, thêm vào
+                firestore.collection("manga").document(mangaId)
+                    .update("authors", listOf("Unknown Author"))
+                    .await()
+                
+                Log.d("MangaRepositoryImpl", "Added default author field to manga $mangaId")
+                
+                // Lấy lại document sau khi cập nhật
+                val updatedMangaDoc = firestore.collection("manga").document(mangaId).get().await()
+                val mangaData = convertFirestoreDocumentToMangaData(updatedMangaDoc, tagMap)
+                return Result.success(mangaData)
+            }
+            
+            val mangaData = convertFirestoreDocumentToMangaData(mangaDoc, tagMap)
+            
+            // Log thông tin về ngôn ngữ và author
+            Log.d("MangaRepositoryImpl", "Manga ${mangaData.id} has available languages: ${mangaData.attributes.availableTranslatedLanguages}")
+            Log.d("MangaRepositoryImpl", "Manga ${mangaData.id} has author: ${mangaData.attributes.author}")
+            
+            Result.success(mangaData)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error loading manga details", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun filterMangaByTags(tagIds: List<String>, filterMode: String): Result<List<MangaData>> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Filtering manga by tags: $tagIds with mode: $filterMode")
+            
+            if (tagIds.isEmpty()) {
+                return fetchMangaListFromFirestore(true, 100)
+            }
+            
+            // Lấy danh sách tags trước
+            val tagsResult = getTagsFromFirestore()
+            val tagMap = tagsResult.getOrNull()?.associateBy { it.id } ?: emptyMap()
+            
+            // Lấy dữ liệu từ Firestore với filter
+            val mangaCollection = firestore.collection("manga")
+            
+            // Sử dụng whereArrayContainsAny để lấy manga có ít nhất một trong các tag đã chọn
+            val query = mangaCollection.whereArrayContainsAny("tagIds", tagIds)
+            
+            val querySnapshot = query.get().await()
+            
+            Log.d("MangaRepositoryImpl", "Fetched ${querySnapshot.documents.size} manga documents for tag filtering")
+            
+            // Chuyển đổi dữ liệu Firestore thành MangaData
+            val mangaList = querySnapshot.documents.mapNotNull { document ->
+                try {
+                    convertFirestoreDocumentToMangaData(document, tagMap)
+                } catch (e: Exception) {
+                    Log.e("MangaRepositoryImpl", "Error parsing manga document: ${document.id}", e)
+                    null
+                }
+            }
+            
+            // Nếu mode là AND, lọc thêm để đảm bảo manga chứa TẤT CẢ các tag đã chọn
+            val filteredList = if (filterMode == "AND" && tagIds.size > 1) {
+                mangaList.filter { manga ->
+                    val mangaTags = manga.attributes.tags.map { it.id }
+                    tagIds.all { tagId -> mangaTags.contains(tagId) }
+                }
+            } else {
+                mangaList
+            }
+            
+            Log.d("MangaRepositoryImpl", "Filtered to ${filteredList.size} manga based on tags")
+            Result.success(filteredList)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error filtering manga by tags", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun incrementMangaViewCount(mangaId: String): Result<Boolean> {
+        return try {
+            Log.d("MangaRepositoryImpl", "Incrementing view count for manga: $mangaId")
+            
+            // Lấy tham chiếu đến document manga
+            val mangaRef = firestore.collection("manga").document(mangaId)
+            
+            // Sử dụng transaction để tăng viewCount một cách an toàn
+            firestore.runTransaction { transaction ->
+                val mangaDoc = transaction.get(mangaRef)
+                
+                // Lấy giá trị viewCount hiện tại hoặc 0 nếu không tồn tại
+                val currentViewCount = mangaDoc.getLong("viewCount") ?: 0
+                
+                // Tăng viewCount lên 1
+                transaction.update(mangaRef, "viewCount", currentViewCount + 1)
+                
+                // Transaction thành công
+                null
+            }.await()
+            
+            Log.d("MangaRepositoryImpl", "Successfully incremented view count for manga: $mangaId")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e("MangaRepositoryImpl", "Error incrementing view count", e)
+            Result.failure(e)
+        }
+    }
 }

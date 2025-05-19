@@ -9,5 +9,5 @@ data class Comment(
     val likes: Int = 0,
     val isEdited: Boolean = false,
     val nickname: String = "Anonymous",
-    val avatar: String? = null // Thêm trường avatar
+    val avatar: String? = null
 )

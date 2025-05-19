@@ -35,9 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.android.dacs3.R
-import com.android.dacs3.data.model.ReadingProgress
-import com.android.dacs3.data.model.coverImageUrl
+import com.android.dacs3.data.model.displayCoverUrl
 import com.android.dacs3.presentations.navigation.BottomNavigationBar
 import com.android.dacs3.utliz.Screens
 import com.android.dacs3.viewmodel.MangaViewModel
@@ -161,13 +159,6 @@ fun HistoryScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-//                        Icon(
-//                            painter = painterResource(id = R.drawable.ic_history),
-//                            contentDescription = null,
-//                            tint = Color(0xFF333333),
-//                            modifier = Modifier.size(28.dp)
-//                        )
-                        Spacer(modifier = Modifier.width(12.dp))
                         Text("Reading History", fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
                     }
                 },
@@ -253,7 +244,7 @@ fun HistoryScreen(
                                     val title = manga.attributes.title["en"] ?: manga.attributes.title.values.firstOrNull() ?: "Unknown"
                                     val chapterNumber = chapter.attributes.chapter ?: ""
                                     val chapterTitle = chapter.attributes.title ?: ""
-                                    val imageUrl = manga.coverImageUrl ?: ""
+                                    val imageUrl = manga.displayCoverUrl
 
                                     key(progress.mangaId + progress.chapterId) {
                                         AnimatedVisibility(

@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
 import com.android.dacs3.presentations.components.MangaItem
 import com.android.dacs3.utliz.Screens
 
@@ -83,10 +84,23 @@ fun FavouriteScreen(
     LaunchedEffect(favourites) {
         viewModel.loadFavouriteDetails()
     }
+
+    if (showDeleteAllDialog) {
+        DeleteConfirmationDialog(
+            title = "Delete All History",
+            message = "Are you sure you want to delete your entire reading history? This action cannot be undone.",
+            onConfirm = {
+                viewModel.deleteAllFavourites()
+                showDeleteAllDialog = false
+            },
+            onDismiss = { showDeleteAllDialog = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Favourites", color = Color.Black) },
+                title = { Text("Favourites", color = Color.Black, fontWeight = FontWeight.SemiBold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.White,
                     titleContentColor = Color.Black,
@@ -220,8 +234,19 @@ fun FavouriteScreen(
                 }
 
                 if (mangaDetails.isEmpty() && !isRefreshing) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No favourites yet.")
+                    EmptyFavouriteDisplay(navController)
+                } else if (isRefreshing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color.Black,
+                            trackColor = Color.LightGray
+                        )
                     }
                 } else {
                     LazyVerticalGrid(
@@ -236,6 +261,50 @@ fun FavouriteScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyFavouriteDisplay(navController: NavController) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Text(
+                text = "No favourites yet",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF333333)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Start reading manga and add to your favourites.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF666666),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { navController.navigate(Screens.ExploreScreen.route) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF333333)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = "Browse Manga",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White
+                )
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.android.dacs3.viewmodel
 
+import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +18,7 @@ import com.android.dacs3.data.model.Tag
 import com.android.dacs3.data.model.TagAttributes
 import com.android.dacs3.data.model.TagWrapper
 import com.android.dacs3.data.repository.AdminRepository
+import com.android.dacs3.data.repository.CloudinaryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,10 +30,16 @@ import java.util.UUID
 import javax.inject.Inject
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.FieldValue
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 @HiltViewModel
 class AdminViewModel @Inject constructor(
-    private val adminRepository: AdminRepository
+    private val adminRepository: AdminRepository,
+    private val cloudinaryRepository: CloudinaryRepository,
+    private val firestore: FirebaseFirestore
 ) : ViewModel() {
 
     private val _users = MutableStateFlow<List<User>>(emptyList())
@@ -55,16 +63,24 @@ class AdminViewModel @Inject constructor(
     private val _mangas = MutableStateFlow<List<MangaData>>(emptyList())
     val mangas: StateFlow<List<MangaData>> = _mangas.asStateFlow()
 
-    private val firestore = FirebaseFirestore.getInstance()
-
     // Add this property to store chapters for the selected manga
     private val _mangaChapters = MutableStateFlow<List<ChapterData>>(emptyList())
     val mangaChapters: StateFlow<List<ChapterData>> = _mangaChapters
 
+    // Add new state for image uploads
+    private val _isUploading = MutableStateFlow(false)
+    val isUploading: StateFlow<Boolean> = _isUploading.asStateFlow()
+    
+    private val _uploadProgress = MutableStateFlow(0f)
+    val uploadProgress: StateFlow<Float> = _uploadProgress.asStateFlow()
+    
+    private val _uploadedImageUrl = MutableStateFlow<String?>(null)
+    val uploadedImageUrl: StateFlow<String?> = _uploadedImageUrl.asStateFlow()
+
     init {
         loadAllUsers()
         fetchTagsFromFirestore()
-        loadMangaList()
+        loadMangaList() // Make sure this is called in init
     }
 
     fun loadAllUsers() {
@@ -210,165 +226,62 @@ class AdminViewModel @Inject constructor(
 
     fun fetchTagsFromFirestore() {
         viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            
             try {
-                Log.d("AdminViewModel", "Fetching tags from Firestore")
-                
-                val querySnapshot = firestore.collection("tags")
-                    .get()
-                    .await()
-                
-                Log.d("AdminViewModel", "Fetched ${querySnapshot.documents.size} tag documents")
-                
-                val tags = querySnapshot.documents.mapNotNull { document ->
-                    try {
-                        val id = document.id
-                        val name = document.getString("name") ?: return@mapNotNull null
-                        val group = document.getString("group") ?: "unknown"
+                adminRepository.getAllTags()
+                    .onSuccess { tags ->
+                        _firestoreTags.value = tags
                         
-                        Tag(id = id, name = name, group = group)
-                    } catch (e: Exception) {
-                        Log.e("AdminViewModel", "Error parsing tag document: ${document.id}", e)
-                        null
+                        // Convert to TagWrapper
+                        val tagWrappers = tags.map { tag ->
+                            TagWrapper(
+                                id = tag.id,
+                                type = "tag",
+                                attributes = TagAttributes(
+                                    name = mapOf("en" to tag.name),
+                                    group = tag.group,
+                                    description = emptyMap()
+                                )
+                            )
+                        }
+                        
+                        _tags.value = tagWrappers
+                        Log.d("AdminViewModel", "Loaded ${tags.size} tags from repository")
                     }
-                }
-                
-                _firestoreTags.value = tags
-                
-                // Chuyển đổi từ Tag sang TagWrapper
-                val tagWrappers = tags.map { tag ->
-                    TagWrapper(
-                        id = tag.id,
-                        type = "tag",
-                        attributes = TagAttributes(
-                            name = mapOf("en" to tag.name),
-                            group = tag.group,
-                            description = emptyMap()
-                        )
-                    )
-                }
-                
-                _tags.value = tagWrappers
-                
-                Log.d("AdminViewModel", "Successfully parsed ${tags.size} tags")
-                
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to load tags"
+                        Log.e("AdminViewModel", "Error loading tags", e)
+                    }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error fetching tags from Firestore", e)
-                _errorMessage.value = "Failed to load tags: ${e.message}"
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception loading tags", e)
+            } finally {
+                _isLoading.value = false
             }
         }
-    }
-
-    fun getTagById(tagId: String): TagWrapper? {
-        return _tags.value.find { it.id == tagId }
-    }
-
-    fun getTagsByIds(tagIds: List<String>): List<TagWrapper> {
-        return _tags.value.filter { tagIds.contains(it.id) }
-    }
-
-    fun getTagNameById(tagId: String): String {
-        val tag = _tags.value.find { it.id == tagId }
-        return tag?.attributes?.name?.get("en") ?: "Unknown Tag"
     }
 
     fun loadMangaList() {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
+            
             try {
-                // Đảm bảo tags đã được tải
-                if (_firestoreTags.value.isEmpty()) {
-                    fetchTagsFromFirestore()
-                    kotlinx.coroutines.delay(500) // Đợi tags được tải
-                }
-                
-                // Lấy tất cả dữ liệu từ Firestore
-                val mangaCollection = firestore.collection("manga")
-                val query = mangaCollection.orderBy("lastUpdated", Query.Direction.DESCENDING)
-                
-                val querySnapshot = query.get().await()
-                
-                Log.d("AdminViewModel", "Fetched ${querySnapshot.documents.size} manga documents from Firestore")
-                
-                // Tạo map từ tagId đến Tag object để dễ dàng tra cứu
-                val tagMap = _firestoreTags.value.associateBy { it.id }
-                
-                // Chuyển đổi dữ liệu Firestore thành MangaData
-                val mangaList = querySnapshot.documents.mapNotNull { document ->
-                    try {
-                        val id = document.id
-                        
-                        // Xử lý ảnh bìa - ưu tiên coverImageUrl
-                        val coverImageUrl = document.getString("coverImageUrl") ?: ""
-                        val coverUrl = document.getString("coverUrl") ?: ""
-                        
-                        // Xác định URL cuối cùng theo thứ tự ưu tiên
-                        val finalCoverUrl = when {
-                            // 1. Ưu tiên coverImageUrl nếu có
-                            coverImageUrl.isNotEmpty() -> coverImageUrl
-                            // 2. Thử coverUrl nếu có
-                            coverUrl.isNotEmpty() && coverUrl.startsWith("http") -> coverUrl
-                            // 3. Nếu không có cả hai, sử dụng placeholder
-                            else -> "https://via.placeholder.com/512x768?text=No+Cover"
-                        }
-                        
-                        // Lấy thông tin cơ bản
-                        val title = document.getString("title") ?: "Unknown"
-                        val description = document.getString("description") ?: ""
-                        val status = document.getString("status") ?: "ongoing"
-                        
-                        // Xử lý tags
-                        val tagIds = document.get("tagIds") as? List<String> ?: emptyList()
-                        
-                        // Chuyển đổi tagIds thành đối tượng TagWrapper
-                        val tags = tagIds.mapNotNull { tagId ->
-                            tagMap[tagId]?.let { tag ->
-                                TagWrapper(
-                                    id = tag.id,
-                                    type = "tag",
-                                    attributes = TagAttributes(
-                                        name = mapOf("en" to tag.name),
-                                        group = tag.group,
-                                        description = emptyMap()
-                                    )
-                                )
-                            }
-                        }
-                        
-                        // Tạo đối tượng MangaData với tags
-                        MangaData(
-                            id = id,
-                            attributes = MangaAttributes(
-                                title = mapOf("en" to title),
-                                description = mapOf("en" to description),
-                                status = status,
-                                availableTranslatedLanguages = listOf("en"),
-                                altTitles = emptyList(),
-                                tags = tags
-                            ),
-                            relationships = listOf(
-                                Relationship(
-                                    id = id,
-                                    type = "cover_art",
-                                    attributes = RelationshipAttributes(
-                                        fileName = finalCoverUrl
-                                    )
-                                )
-                            )
-                        )
-                    } catch (e: Exception) {
-                        Log.e("AdminViewModel", "Error parsing manga document: ${document.id}", e)
-                        null
+                Log.d("AdminViewModel", "Starting to load manga list")
+                adminRepository.getAllMangas()
+                    .onSuccess { mangaList ->
+                        _mangas.value = mangaList
+                        Log.d("AdminViewModel", "Successfully loaded ${mangaList.size} manga from repository")
                     }
-                }
-                
-                // Cập nhật danh sách manga
-                _mangas.value = mangaList
-                
-                Log.d("AdminViewModel", "Loaded ${mangaList.size} manga from Firestore")
-                
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to load manga list"
+                        Log.e("AdminViewModel", "Error loading manga list", e)
+                    }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error loading manga list", e)
-                _errorMessage.value = "Failed to load manga list: ${e.message}"
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception loading manga list", e)
             } finally {
                 _isLoading.value = false
             }
@@ -391,34 +304,26 @@ class AdminViewModel @Inject constructor(
         description: String,
         coverUrl: String,
         status: String,
-        tags: List<String>
+        author: String,
+        tagIds: List<String>
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
+            
             try {
-                val mangaId = UUID.randomUUID().toString()
-                
-                val mangaData = hashMapOf(
-                    "title" to title,
-                    "description" to description,
-                    "coverUrl" to coverUrl,
-                    "status" to status,
-                    "tagIds" to tags,
-                    "lastUpdated" to System.currentTimeMillis()
-                )
-                
-                firestore.collection("manga").document(mangaId)
-                    .set(mangaData)
-                    .await()
-                
-                Log.d("AdminViewModel", "Added new manga: $title")
-                
-                // Reload manga list
-                loadMangaList()
-                
+                adminRepository.addManga(title, description, coverUrl, status, author, tagIds)
+                    .onSuccess { mangaId ->
+                        Log.d("AdminViewModel", "Added manga with ID: $mangaId")
+                        loadMangaList() // Reload manga list
+                    }
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to add manga"
+                        Log.e("AdminViewModel", "Error adding manga", e)
+                    }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error adding manga", e)
-                _errorMessage.value = "Failed to add manga: ${e.message}"
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception adding manga", e)
             } finally {
                 _isLoading.value = false
             }
@@ -431,32 +336,26 @@ class AdminViewModel @Inject constructor(
         description: String,
         coverUrl: String,
         status: String,
-        tags: List<String>
+        author: String,
+        tagIds: List<String>
     ) {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
+            
             try {
-                val mangaData = hashMapOf(
-                    "title" to title,
-                    "description" to description,
-                    "coverUrl" to coverUrl,
-                    "status" to status,
-                    "tagIds" to tags,
-                    "lastUpdated" to System.currentTimeMillis()
-                )
-                
-                firestore.collection("manga").document(mangaId)
-                    .update(mangaData as Map<String, Any>)
-                    .await()
-                
-                Log.d("AdminViewModel", "Updated manga: $title")
-                
-                // Reload manga list
-                loadMangaList()
-                
+                adminRepository.updateManga(mangaId, title, description, coverUrl, status, author, tagIds)
+                    .onSuccess {
+                        Log.d("AdminViewModel", "Updated manga with cover url: $coverUrl")
+                        loadMangaList() // Reload manga list
+                    }
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to update manga"
+                        Log.e("AdminViewModel", "Error updating manga", e)
+                    }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error updating manga", e)
-                _errorMessage.value = "Failed to update manga: ${e.message}"
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception updating manga", e)
             } finally {
                 _isLoading.value = false
             }
@@ -466,31 +365,21 @@ class AdminViewModel @Inject constructor(
     fun deleteManga(mangaId: String) {
         viewModelScope.launch {
             _isLoading.value = true
+            _errorMessage.value = null
+            
             try {
-                // Delete manga document
-                firestore.collection("manga").document(mangaId)
-                    .delete()
-                    .await()
-                
-                // Delete all chapters associated with this manga
-                val chaptersQuery = firestore.collection("manga").document(mangaId)
-                    .collection("chapters").get().await()
-                
-                for (chapterDoc in chaptersQuery.documents) {
-                    firestore.collection("manga").document(mangaId)
-                        .collection("chapters").document(chapterDoc.id)
-                        .delete()
-                        .await()
-                }
-                
-                Log.d("AdminViewModel", "Deleted manga: $mangaId")
-                
-                // Reload manga list
-                loadMangaList()
-                
+                adminRepository.deleteManga(mangaId)
+                    .onSuccess {
+                        Log.d("AdminViewModel", "Deleted manga with ID: $mangaId")
+                        loadMangaList() // Reload manga list
+                    }
+                    .onFailure { e ->
+                        _errorMessage.value = e.message ?: "Failed to delete manga"
+                        Log.e("AdminViewModel", "Error deleting manga", e)
+                    }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error deleting manga", e)
-                _errorMessage.value = "Failed to delete manga: ${e.message}"
+                _errorMessage.value = e.message ?: "An unexpected error occurred"
+                Log.e("AdminViewModel", "Exception deleting manga", e)
             } finally {
                 _isLoading.value = false
             }
@@ -633,6 +522,83 @@ class AdminViewModel @Inject constructor(
             }
         }
     }
+
+    // New methods for image upload
+    fun uploadMangaCover(imageUri: Uri): Flow<Result<String>> = flow {
+        _isUploading.value = true
+        _uploadProgress.value = 0f
+        _uploadedImageUrl.value = null
+        
+        try {
+            Log.d("AdminViewModel", "Starting manga cover upload")
+            emit(Result.Loading(0f))
+            
+            // Use CloudinaryRepository to upload the image
+            val result = cloudinaryRepository.uploadCoverImage(imageUri)
+            
+            result.onSuccess { url ->
+                Log.d("AdminViewModel", "Cover upload successful: $url")
+                _uploadedImageUrl.value = url
+                emit(Result.Success(url))
+            }.onFailure { e ->
+                Log.e("AdminViewModel", "Cover upload failed", e)
+                emit(Result.Failure(e.message ?: "Failed to upload cover image"))
+            }
+        } catch (e: Exception) {
+            Log.e("AdminViewModel", "Exception during cover upload", e)
+            emit(Result.Failure(e.message ?: "An unexpected error occurred"))
+        } finally {
+            _isUploading.value = false
+        }
+    }
+    
+    fun uploadChapterImage(imageUri: Uri): Flow<Result<String>> = flow {
+        _isUploading.value = true
+        _uploadProgress.value = 0f
+        
+        try {
+            Log.d("AdminViewModel", "Starting chapter image upload")
+            emit(Result.Loading(0f))
+            
+            // Use CloudinaryRepository to upload the image
+            // For chapter images, we can use the regular uploadImage method
+            val result = cloudinaryRepository.uploadImage(imageUri)
+            
+            result.onSuccess { url ->
+                Log.d("AdminViewModel", "Chapter image upload successful: $url")
+                _uploadedImageUrl.value = url
+                emit(Result.Success(url))
+            }.onFailure { e ->
+                Log.e("AdminViewModel", "Chapter image upload failed", e)
+                emit(Result.Failure(e.message ?: "Failed to upload chapter image"))
+            }
+        } catch (e: Exception) {
+            Log.e("AdminViewModel", "Exception during chapter image upload", e)
+            emit(Result.Failure(e.message ?: "An unexpected error occurred"))
+        } finally {
+            _isUploading.value = false
+        }
+    }
+    
+    // Helper sealed class for upload results
+    sealed class Result<out T> {
+        data class Success<T>(val data: T) : Result<T>()
+        data class Failure(val message: String) : Result<Nothing>()
+        data class Loading(val progress: Float) : Result<Nothing>()
+    }
+
+    // Add this method to reset upload state
+    fun resetUploadState() {
+        _isUploading.value = false
+        _uploadProgress.value = 0f
+        _uploadedImageUrl.value = null
+    }
 }
+
+
+
+
+
+
 
 

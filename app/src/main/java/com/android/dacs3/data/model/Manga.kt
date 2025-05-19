@@ -21,6 +21,7 @@ data class MangaData(
 data class MangaAttributes(
     val title: Map<String, String>,
     val altTitles: List<Map<String, String>> = emptyList(),
+    val author: String?,
     val availableTranslatedLanguages: List<String> = emptyList(),
     val description: Map<String, String>,
     val status: String?,
@@ -49,21 +50,6 @@ data class RelationshipAttributes(
     val fileName: String? = null,
     val name: String? = null
 )
-
-val MangaData.coverImageUrl: String?
-    get() {
-        val coverArt = relationships.find { it.type == "cover_art" }
-        val fileName = coverArt?.attributes?.fileName
-        return fileName?.let { "https://uploads.mangadex.org/covers/$id/$it.512.jpg" }
-    }
-
-val MangaData.directCoverImageUrl: String?
-    get() {
-        val coverArt = relationships.find { it.type == "cover_art" }
-        val fileName = coverArt?.attributes?.fileName
-        Log.d("MangaModel", "directCoverImageUrl for manga $id: $fileName")
-        return fileName
-    }
 
 // Cập nhật extension property để lấy URL hiển thị
 val MangaData.displayCoverUrl: String
